@@ -2,6 +2,7 @@ package dataaccess
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 
@@ -31,15 +32,19 @@ func init() {
 
 func Init() {
 
-	user, err := GetUserByUsername("jonbul")
+	user, err := GetUserByUsername("test")
 
 	log.Println("------------------------------")
-	if err != nil && err != mongo.ErrNoDocuments {
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		log.Fatal("Error finding user:", err)
-	} else if err == mongo.ErrNoDocuments {
+	} else if errors.Is(err, mongo.ErrNoDocuments) {
 		log.Println("Connection works but no user found with username:", "jonbul")
+	} else if nil != user && nil == err {
+		log.Printf("User found with username: %s, email: %s\n", user.Username, user.Email)
+	} else if nil != err {
+		log.Printf("Something happened: %s\n", err.Error())
 	} else {
-		log.Printf("User found with username: %s, email: %s", user.Username, user.Email)
+		log.Println("¯\\_(ツ)_/¯")
 	}
 	log.Println("------------------------------")
 
@@ -47,8 +52,11 @@ func Init() {
 
 func getCollection() *mongo.Collection {
 	client, err := mongo.Connect(options.Client().ApplyURI(MongoUri))
-	if err != nil {
-		client.Disconnect(context.TODO())
+	if err != nil && nil != client {
+		err := client.Disconnect(context.TODO())
+		if err != nil {
+			return nil
+		}
 		log.Fatal("Error connecting to MongoDB:", err)
 	}
 	return client.Database("jaes", nil).Collection("users")

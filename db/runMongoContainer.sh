@@ -78,8 +78,8 @@ echo "MongoDB is up and running."
 
 # Create user and password for mongo
 echo "Creating MongoDB users..."
-runMongoCommand "admin" "db.createUser({user: 'testAdmin', pwd: 'admin', roles: [{ role: 'readWriteAnyDatabase', db: 'admin' },{ role: 'userAdminAnyDatabase', db: 'admin' },{ role: 'dbAdminAnyDatabase', db: 'admin' }]});"
-runMongoCommand "jaes" "db.createUser({user: 'test', pwd: 'jaes', roles: [ { role: 'readWrite', db: 'jaes' } ]});"
+runMongoCommand "admin" "db.createUser({user: 'testAdmin', pwd: 'testAdmin', roles: [{ role: 'readWriteAnyDatabase', db: 'admin' },{ role: 'userAdminAnyDatabase', db: 'admin' },{ role: 'dbAdminAnyDatabase', db: 'admin' }]});"
+runMongoCommand "jaes" "db.createUser({user: 'test', pwd: 'test', roles: [ { role: 'readWrite', db: 'jaes' } ]});"
 
 # Connect mongo and create the database and collection
 echo "Creating MongoDB database and collections..."
