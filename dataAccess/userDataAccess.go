@@ -59,6 +59,10 @@ func getCollection() *mongo.Collection {
 		}
 		log.Fatal("Error connecting to MongoDB:", err)
 	}
+	if nil == client {
+		log.Fatal("Error connecting to MongoDB")
+	}
+
 	return client.Database("jaes", nil).Collection("users")
 }
 
