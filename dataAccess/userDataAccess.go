@@ -30,7 +30,7 @@ func init() {
 	log.Println("MongoUri loaded in DataAccess: " + MongoUri[:4] + "...")
 }
 
-func Init() {
+func Test() {
 
 	user, err := GetUserByUsername("test")
 

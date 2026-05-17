@@ -21,7 +21,7 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	dataaccess.Init()
+	dataaccess.Test()
 
 	//envFile, err := godotenv.Read(".env")
 	router := gin.Default()

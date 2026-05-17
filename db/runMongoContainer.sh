@@ -19,7 +19,8 @@ loadTestData() {
         dbname=$(basename "$file" | cut -d. -f1)
         collection=$(basename "$file" | cut -d. -f2)
 
-        echo "\nCreate collection $dbname.$collection"
+        echo ""
+        echo "Create collection $dbname.$collection"
         runMongoCommand "$dbname" "db.createCollection('$collection');"
 
         echo "Loading test data from $file into $dbname.$collection"
