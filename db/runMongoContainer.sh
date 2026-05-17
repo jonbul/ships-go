@@ -8,6 +8,7 @@ killAndRemoveContainer() {
     fi
 }
 runMongoCommand() {
+    echo "Running MongoDB command on database $1: $2"
     docker exec -it mongodb mongosh \
       -u admin -p admin --authenticationDatabase admin \
       --eval "var db = db.getSiblingDB('$1'); $2"
@@ -17,6 +18,10 @@ loadTestData() {
     for file in ./testData/*.json; do
         dbname=$(basename "$file" | cut -d. -f1)
         collection=$(basename "$file" | cut -d. -f2)
+
+        echo "\nCreate collection $dbname.$collection"
+        runMongoCommand "$dbname" "db.createCollection('$collection');"
+
         echo "Loading test data from $file into $dbname.$collection"
         docker cp "$file" mongodb:/tmp/testdata.json
         docker exec mongodb mongoimport \
@@ -81,20 +86,13 @@ echo "Creating MongoDB users..."
 runMongoCommand "admin" "db.createUser({user: 'testAdmin', pwd: 'testAdmin', roles: [{ role: 'readWriteAnyDatabase', db: 'admin' },{ role: 'userAdminAnyDatabase', db: 'admin' },{ role: 'dbAdminAnyDatabase', db: 'admin' }]});"
 runMongoCommand "jaes" "db.createUser({user: 'test', pwd: 'test', roles: [ { role: 'readWrite', db: 'jaes' } ]});"
 
-# Connect mongo and create the database and collection
-echo "Creating MongoDB database and collections..."
-runMongoCommand "jaes" "db.createCollection('paintingprojects');"
-runMongoCommand "jaes" "db.createCollection('sessions');"
-runMongoCommand "jaes" "db.createCollection('ships');"
-runMongoCommand "jaes" "db.createCollection('users');"
-
 # load test data from json files in ./testData/{dbname}.{collection}.json
 echo "Loading test data into MongoDB..."
 loadTestData
 
 # Write exit to kill container
-echo "Write exit to kill container"
 while true; do
+    echo "Write exit to kill container: "
     read -p "" input
     if [ "$input" = "exit" ]; then
         killAndRemoveContainer
