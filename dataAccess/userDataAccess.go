@@ -79,7 +79,7 @@ func GetUserByEmail(email string) (*models.User, error) {
 
 func GetUserByEmailAndPassword(email string, password string) (*models.User, error) {
 	var user, err = GetUserByEmail(email)
-	if err != nil {
+	if err != nil || nil == user {
 		return nil, err
 	}
 

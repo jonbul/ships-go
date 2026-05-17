@@ -2,7 +2,10 @@ package main
 
 import (
 	"log"
+	"os"
+	"strings"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
@@ -12,6 +15,7 @@ import (
 
 func init() {
 	log.Default()
+	_ = godotenv.Load()
 }
 
 func main() {
@@ -23,9 +27,18 @@ func main() {
 
 	dataaccess.Test()
 
-	//envFile, err := godotenv.Read(".env")
 	router := gin.Default()
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = strings.Split(os.Getenv("ALLOWED_ORIGINS"), "|")
+	corsConfig.AllowCredentials = true
+	corsConfig.AddAllowHeaders("Authorization")
+	corsConfig.AddAllowMethods("GET", "POST", "PUT", "PATCH", "OPTIONS")
+	router.Use(cors.New(corsConfig))
 	controllers.RegisterUserRoutes(router)
-	router.Run(":3000")
+	err = router.RunTLS(":3000", "./ssl/cert.pem", "./ssl/key.pem")
+	if err != nil {
+		log.Fatal("Error setting up SSH Server", err)
+	}
+
 	log.Println("Server is running on port 3000")
 }
