@@ -53,8 +53,8 @@ func saveProject(c *gin.Context) {
 	var project Project
 	err = c.BindJSON(&project)
 
-	if err != nil || nil == session {
-		c.IndentedJSON(http.StatusUnauthorized, gin.H{"success": false, "errors": []string{"invalid request body"}})
+	if err != nil {
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"success": false, "errors": []string{err.Error()}})
 		return
 	}
 	project.Project.UserId = session.UserId

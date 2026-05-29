@@ -17,7 +17,7 @@ var PaintingBoardDataAccess = PaintingBoardDataAccessType{
 }
 
 func (dataAccess PaintingBoardDataAccessType) GetProjectsByUserId(userId string) (*[]models.PaintingProject, error) {
-	var result *[]models.PaintingProject = &[]models.PaintingProject{}
+	var result = &[]models.PaintingProject{}
 	err := dataAccess.ExecuteSecurely(CollectionNames.paintingProjects(), func(collection mongo.Collection) error {
 		cursor, err := collection.Find(context.TODO(), bson.D{{Key: "userId", Value: userId}})
 		if nil != err {
