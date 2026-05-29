@@ -25,7 +25,7 @@ func (collectionNames) ships() string {
 	return "ships"
 }
 func (collectionNames) paintingProjects() string {
-	return "paintingProjects"
+	return "paintingprojects"
 }
 
 var CollectionNames = collectionNames{}

@@ -11,13 +11,14 @@ import (
 const SESSIONDURATION = 30 * 24 * 3600000
 
 type Session struct {
-	Admin            bool   `json:"admin"`
-	UserId           string `json:"userId"`
-	SessionTimeStamp int64  `json:"sessionTimestamp"`
-	Persistent       bool   `json:"persistent"`
-	Token            string `json:"token"`
-	LoggedOut        bool   `json:"loggedOut"`
-	ExpirationTime   int64  `json:"expirationTime"`
+	Id               bson.ObjectID `json:"_id" bson:"_id,omitempty"`
+	Admin            bool          `json:"admin" bson:"admin"`
+	UserId           string        `json:"userId" bson:"userId"`
+	SessionTimeStamp int64         `json:"sessionTimestamp" bson:"sessionTimestamp"`
+	Persistent       bool          `json:"persistent" bson:"persistent"`
+	Token            string        `json:"token" bson:"token"`
+	LoggedOut        bool          `json:"loggedOut" bson:"loggedOut"`
+	ExpirationTime   int64         `json:"expirationTime" bson:"expirationTime"`
 }
 
 func (session *Session) UserIdAsBsonObject() bson.ObjectID {

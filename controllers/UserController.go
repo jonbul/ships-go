@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"log"
-	"ships/models"
 	"time"
 
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ships/dataAccess"
+	"ships/models"
 )
 
 type BodyUser struct {
@@ -31,7 +31,6 @@ func RegisterUserRoutes(router *gin.Engine) {
 	router.POST("/login", loginUser)
 
 	router.GET("/userInfo", userInfo)
-	// Add more user-related routes here
 }
 
 func getStatus(c *gin.Context) {
@@ -41,9 +40,8 @@ func getStatus(c *gin.Context) {
 
 func userInfo(c *gin.Context) {
 
-	session, err := ValidateSession(c)
-	if nil != err || nil == session || session.IsExpired() {
-		c.IndentedJSON(http.StatusUnauthorized, gin.H{"errors": []string{"invalid request body"}})
+	session := ValidateSession(c)
+	if nil == session || session.IsExpired() {
 		return
 	}
 
@@ -51,7 +49,7 @@ func userInfo(c *gin.Context) {
 	if err != nil {
 
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"user": user})
+	c.IndentedJSON(http.StatusOK, user)
 }
 
 func registerUser(c *gin.Context) {
@@ -119,9 +117,17 @@ func loginUser(c *gin.Context) {
 	})
 }
 
-func ValidateSession(c *gin.Context) (*models.Session, error) {
+func ValidateSession(c *gin.Context) *models.Session {
 	cookie, err := c.Cookie("token")
 	session, err := sessionDataAccess.GetSessionByToken(cookie)
+	if nil != err || nil == session || session.IsExpired() {
+		InvalidateSession(c)
+		return nil
+	}
+	return session
+}
 
-	return session, err
+func InvalidateSession(c *gin.Context) {
+	c.SetCookie("token", "", -1, "", "", true, true)
+	c.Redirect(http.StatusUnauthorized, "/login")
 }

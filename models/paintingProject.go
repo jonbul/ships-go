@@ -1,13 +1,16 @@
 package models
 
+import "go.mongodb.org/mongo-driver/v2/bson"
+
 type PaintingProject struct {
-	UserId       string `json:"userId"`
-	Name         string `json:"name"`
-	DateCreated  string `json:"dateCreated"`
-	DateModified string `json:"dateModified"`
+	Id           bson.ObjectID `json:"_id" bson:"_id,omitempty"`
+	UserId       string        `json:"userId" bson:"userId"`
+	Name         string        `json:"name" bson:"name"`
+	DateCreated  int64         `json:"dateCreated" bson:"dateCreated"`
+	DateModified int64         `json:"dateModified" bson:"dateModified"`
 	Canvas       struct {
-		Width  float32 `json:"width"`
-		Height float32 `json:"height"`
+		Width  string `json:"width"`
+		Height string `json:"height"`
 	} `json:"canvas"`
 	Layers []Layer `json:"layers"`
 }
