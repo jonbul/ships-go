@@ -58,7 +58,7 @@ func (dataAccess UserDataAccessType) GetUserByEmailAndPassword(email string, pas
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, errors.New("Invalid password or username provided")
+		return nil, errors.New("invalid password or username provided")
 	}
 	user.Password = ""
 	return user, nil
@@ -71,7 +71,7 @@ func (dataAccess UserDataAccessType) CreateUser(username string, email string, p
 	}
 
 	if err == nil { // User or email already exist
-		return nil, errors.New("User already exists")
+		return nil, errors.New("user already exists")
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

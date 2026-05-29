@@ -25,11 +25,11 @@ func (session *Session) UserIdAsBsonObject() bson.ObjectID {
 	return id
 }
 
-func (s Session) IsExpired() bool {
-	if s.Persistent {
+func (session *Session) IsExpired() bool {
+	if session.Persistent {
 		return false
 	}
-	return s.ExpirationTime < time.Now().UnixMilli()
+	return session.ExpirationTime < time.Now().UnixMilli()
 }
 
 func NewSession(userId string, admin bool, persistent bool) Session {

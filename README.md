@@ -1,7 +1,7 @@
 # About
 
 Backend API for Ships game, a 2D multiplayer game with custom ships created by the user.
-This is a project migrated from Express JS
+This is a project migrated from Express.js
 
 - Frontend: https://github.com/jonbul/ships-vue
 - Being migrated from: https://github.com/jonbul/jaes
@@ -15,7 +15,7 @@ Only as audit
 Required for 1.0 and deploy
 
 - [ ] Learn GO
-- [ ] Create an https Rest API with access to Mongo DB
+- [ ] Create a https Rest API with access to Mongo DB
   - [ ] Register user, login and delete
   - [ ] Manage ships (return, edit, create)
 - [ ] Websocket to make the game working as works now in https://jonbul.ddns.net
