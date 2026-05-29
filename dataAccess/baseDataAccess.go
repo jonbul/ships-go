@@ -2,7 +2,6 @@ package dataaccess
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 
@@ -44,7 +43,11 @@ func init() {
 	log.Println("MongoUri loaded in DataAccess: " + MongoUri[:4] + "...")
 }
 
-func getClient() *mongo.Client {
+type baseDataAccess struct{}
+
+var BaseDataAccess = baseDataAccess{}
+
+func (baseDataAccess) getClient() *mongo.Client {
 	client, err := mongo.Connect(options.Client().ApplyURI(MongoUri))
 	if err != nil && nil != client {
 		err := client.Disconnect(context.TODO())
@@ -59,34 +62,14 @@ func getClient() *mongo.Client {
 	return client
 }
 
-func getCollection(client *mongo.Client, collectionName string) *mongo.Collection {
+func (baseDataAccess) getCollection(client *mongo.Client, collectionName string) *mongo.Collection {
 	return client.Database("jaes", nil).Collection(collectionName)
 }
 
-func ExecuteSecurely(collectionName string, method func(mongo.Collection) error) error {
-	mongoClient := getClient()
-	collection := getCollection(mongoClient, collectionName)
+func (da baseDataAccess) ExecuteSecurely(collectionName string, method func(mongo.Collection) error) error {
+	mongoClient := da.getClient()
+	collection := da.getCollection(mongoClient, collectionName)
 	res := method(*collection)
 	mongoClient.Disconnect(context.TODO())
 	return res
-}
-
-func Test() {
-
-	user, err := GetUserByUsername("test")
-
-	log.Println("------------------------------")
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		log.Fatal("Error finding user:", err)
-	} else if errors.Is(err, mongo.ErrNoDocuments) {
-		log.Println("Connection works but no user found with username:", "jonbul")
-	} else if nil != user && nil == err {
-		log.Printf("User found with username: %s, email: %s\n", user.Username, user.Email)
-	} else if nil != err {
-		log.Printf("Something happened: %s\n", err.Error())
-	} else {
-		log.Println("¯\\_(ツ)_/¯")
-	}
-	log.Println("------------------------------")
-
 }

@@ -8,16 +8,24 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
-func InsertSession(session models.Session) error {
-	return ExecuteSecurely(CollectionNames.sessions(), func(collection mongo.Collection) error {
+type SessionDataAccessType struct {
+	*baseDataAccess
+}
+
+var SessionDataAccess = SessionDataAccessType{
+	baseDataAccess: &BaseDataAccess,
+}
+
+func (dataAccess SessionDataAccessType) InsertSession(session models.Session) error {
+	return dataAccess.ExecuteSecurely(CollectionNames.sessions(), func(collection mongo.Collection) error {
 		_, err := collection.InsertOne(context.Background(), session)
 		return err
 	})
 }
 
-func GetSessionByToken(token string) (*models.Session, error) {
+func (dataAccess SessionDataAccessType) GetSessionByToken(token string) (*models.Session, error) {
 	var session models.Session
-	err := ExecuteSecurely(CollectionNames.sessions(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.sessions(), func(collection mongo.Collection) error {
 		return collection.FindOne(context.Background(), bson.M{"token": token}).Decode(&session)
 	})
 	return &session, err

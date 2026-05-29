@@ -20,6 +20,9 @@ type BodyUser struct {
 	RememberMe bool   `json:"rememberMe" default:""` // only login
 }
 
+var userDataAccess dataaccess.UserDataAccessType = dataaccess.UserDataAccess
+var sessionDataAccess dataaccess.SessionDataAccessType = dataaccess.SessionDataAccess
+
 func RegisterUserRoutes(router *gin.Engine) {
 	router.GET("/status", getStatus)
 
@@ -39,7 +42,7 @@ func getStatus(c *gin.Context) {
 func userInfo(c *gin.Context) {
 
 	session, err := ValidateSession(c)
-	user, err := dataaccess.GetUserByID(session.UserIdAsBsonObject())
+	user, err := userDataAccess.GetUserByID(session.UserIdAsBsonObject())
 	if err != nil {
 
 	}
@@ -56,7 +59,7 @@ func registerUser(c *gin.Context) {
 	if user.Username == "" || user.Password == "" || user.Password != user.Cpassword {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
 	}
-	dbUser, err := dataaccess.CreateUser(user.Username, user.Email, user.Password)
+	dbUser, err := userDataAccess.CreateUser(user.Username, user.Email, user.Password)
 
 	if nil != err || dbUser == nil {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": err.Error()})
@@ -83,7 +86,7 @@ func loginUser(c *gin.Context) {
 		expirationTime = now + 30*24*3600000
 	}
 
-	dbUser, err := dataaccess.GetUserByEmailAndPassword(user.Email, user.Password)
+	dbUser, err := userDataAccess.GetUserByEmailAndPassword(user.Email, user.Password)
 
 	if nil != err || nil == dbUser {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
@@ -91,7 +94,7 @@ func loginUser(c *gin.Context) {
 	}
 
 	session := models.NewSession(dbUser.IdAsString(), dbUser.Admin, user.RememberMe)
-	err = dataaccess.InsertSession(session)
+	err = sessionDataAccess.InsertSession(session)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -107,7 +110,7 @@ func loginUser(c *gin.Context) {
 
 func ValidateSession(c *gin.Context) (*models.Session, error) {
 	cookie, err := c.Cookie("token")
-	session, err := dataaccess.GetSessionByToken(cookie)
+	session, err := sessionDataAccess.GetSessionByToken(cookie)
 	if nil != err || nil == session || session.IsExpired() {
 		return nil, err
 	}

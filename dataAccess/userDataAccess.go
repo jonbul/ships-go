@@ -11,37 +11,45 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func GetUserByUsername(username string) (*models.User, error) {
+type UserDataAccessType struct {
+	*baseDataAccess
+}
+
+var UserDataAccess = UserDataAccessType{
+	baseDataAccess: &BaseDataAccess,
+}
+
+func (dataAccess UserDataAccessType) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
 
-	error := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	error := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		return collection.FindOne(nil, bson.D{{Key: "username", Value: username}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, error
 }
 
-func GetUserByEmail(email string) (*models.User, error) {
+func (dataAccess UserDataAccessType) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
-	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		return collection.FindOne(nil, bson.D{{Key: "email", Value: email}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, err
 }
 
-func GetUserByID(id bson.ObjectID) (*models.User, error) {
+func (dataAccess UserDataAccessType) GetUserByID(id bson.ObjectID) (*models.User, error) {
 	var user models.User
-	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		return collection.FindOne(nil, bson.D{{Key: "_id", Value: id}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, err
 }
 
-func GetUserByEmailAndPassword(email string, password string) (*models.User, error) {
+func (dataAccess UserDataAccessType) GetUserByEmailAndPassword(email string, password string) (*models.User, error) {
 	var user *models.User
-	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		return collection.FindOne(nil, bson.D{{Key: "email", Value: email}}).Decode(&user)
 	})
 	if err != nil || nil == user {
@@ -56,10 +64,10 @@ func GetUserByEmailAndPassword(email string, password string) (*models.User, err
 	return user, nil
 }
 
-func CreateUser(username string, email string, password string) (*models.User, error) {
-	registeredUser, err := GetUserByEmail(email)
+func (dataAccess UserDataAccessType) CreateUser(username string, email string, password string) (*models.User, error) {
+	registeredUser, err := dataAccess.GetUserByEmail(email)
 	if nil == err && registeredUser == nil {
-		registeredUser, err = GetUserByUsername(username)
+		registeredUser, err = dataAccess.GetUserByUsername(username)
 	}
 
 	if err == nil { // User or email already exist
@@ -80,7 +88,7 @@ func CreateUser(username string, email string, password string) (*models.User, e
 		Deaths:   0,
 	}
 
-	err = ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	err = dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		_, err := collection.InsertOne(context.TODO(), user)
 		return err
 	})
@@ -92,16 +100,36 @@ func CreateUser(username string, email string, password string) (*models.User, e
 	return &user, nil
 }
 
-func UpdateUser(user models.User) error {
-	return ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+func (dataAccess UserDataAccessType) UpdateUser(user models.User) error {
+	return dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		_, err := collection.UpdateByID(context.TODO(), user.Id, bson.D{{Key: "$set", Value: user}})
 		return err
 	})
 }
 
-func DeleteUserById(id string) error {
-	return ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+func (dataAccess UserDataAccessType) DeleteUserById(id string) error {
+	return dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		_, error := collection.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
 		return error
 	})
+}
+
+func Test() {
+
+	user, err := UserDataAccess.GetUserByUsername("test")
+
+	log.Println("------------------------------")
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		log.Fatal("Error finding user:", err)
+	} else if errors.Is(err, mongo.ErrNoDocuments) {
+		log.Println("Connection works but no user found with username:", "jonbul")
+	} else if nil != user && nil == err {
+		log.Printf("User found with username: %s, email: %s\n", user.Username, user.Email)
+	} else if nil != err {
+		log.Printf("Something happened: %s\n", err.Error())
+	} else {
+		log.Println("¯\\_(ツ)_/¯")
+	}
+	log.Println("------------------------------")
+
 }
