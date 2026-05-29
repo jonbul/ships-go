@@ -20,8 +20,8 @@ type BodyUser struct {
 	RememberMe bool   `json:"rememberMe" default:""` // only login
 }
 
-var userDataAccess dataaccess.UserDataAccessType = dataaccess.UserDataAccess
-var sessionDataAccess dataaccess.SessionDataAccessType = dataaccess.SessionDataAccess
+var userDataAccess = dataaccess.UserDataAccess
+var sessionDataAccess = dataaccess.SessionDataAccess
 
 func RegisterUserRoutes(router *gin.Engine) {
 	router.GET("/status", getStatus)
@@ -43,7 +43,7 @@ func userInfo(c *gin.Context) {
 
 	session, err := ValidateSession(c)
 	if nil != err || nil == session || session.IsExpired() {
-		c.IndentedJSON(http.StatusUnauthorized, gin.H{"error": "invalid request body"})
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"errors": []string{"invalid request body"}})
 		return
 	}
 
@@ -58,11 +58,12 @@ func registerUser(c *gin.Context) {
 	var user BodyUser
 	err := c.BindJSON(&user)
 	if nil != err {
-		_ = c.BindJSON(gin.H{"errors": "invalid request body"})
+		_ = c.BindJSON(gin.H{"errors": []string{"invalid request body"}})
 	}
 	log.Printf("register user %s - %s", user.Email, user.Username)
 	if user.Username == "" || user.Password == "" || user.Password != user.Cpassword {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": []string{"invalid request body"}})
+		return
 	}
 	dbUser, err := userDataAccess.CreateUser(user.Username, user.Email, user.Password)
 
@@ -71,7 +72,7 @@ func registerUser(c *gin.Context) {
 		if nil != err {
 			text = err.Error()
 		}
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": text})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": []string{text}})
 	} else {
 		c.IndentedJSON(http.StatusOK, gin.H{"success": true})
 	}
@@ -81,11 +82,12 @@ func loginUser(c *gin.Context) {
 	var user BodyUser
 	err := c.BindJSON(&user)
 	if nil != err {
-		_ = c.BindJSON(gin.H{"errors": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": []string{"invalid request body"}})
+		return
 	}
 	log.Printf("login user %s", user.Email)
 	if user.Email == "" || user.Password == "" {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": []string{"Empty fields"}})
 		return
 	}
 
@@ -98,7 +100,7 @@ func loginUser(c *gin.Context) {
 	dbUser, err := userDataAccess.GetUserByEmailAndPassword(user.Email, user.Password)
 
 	if nil != err || nil == dbUser {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": []string{"invalid request body"}})
 		return
 	}
 
