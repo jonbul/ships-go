@@ -42,6 +42,11 @@ func getStatus(c *gin.Context) {
 func userInfo(c *gin.Context) {
 
 	session, err := ValidateSession(c)
+	if nil != err || nil == session || session.IsExpired() {
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"error": "invalid request body"})
+		return
+	}
+
 	user, err := userDataAccess.GetUserByID(session.UserIdAsBsonObject())
 	if err != nil {
 
@@ -62,7 +67,11 @@ func registerUser(c *gin.Context) {
 	dbUser, err := userDataAccess.CreateUser(user.Username, user.Email, user.Password)
 
 	if nil != err || dbUser == nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": err.Error()})
+		var text = "Something happened while creating user."
+		if nil != err {
+			text = err.Error()
+		}
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": text})
 	} else {
 		c.IndentedJSON(http.StatusOK, gin.H{"success": true})
 	}
@@ -111,8 +120,6 @@ func loginUser(c *gin.Context) {
 func ValidateSession(c *gin.Context) (*models.Session, error) {
 	cookie, err := c.Cookie("token")
 	session, err := sessionDataAccess.GetSessionByToken(cookie)
-	if nil != err || nil == session || session.IsExpired() {
-		return nil, err
-	}
-	return session, nil
+
+	return session, err
 }

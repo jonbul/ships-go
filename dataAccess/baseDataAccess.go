@@ -69,7 +69,7 @@ func (baseDataAccess) getCollection(client *mongo.Client, collectionName string)
 func (da baseDataAccess) ExecuteSecurely(collectionName string, method func(mongo.Collection) error) error {
 	mongoClient := da.getClient()
 	collection := da.getCollection(mongoClient, collectionName)
-	res := method(*collection)
-	mongoClient.Disconnect(context.TODO())
-	return res
+	err1 := method(*collection)
+	_ = mongoClient.Disconnect(context.TODO())
+	return err1
 }

@@ -22,11 +22,11 @@ var UserDataAccess = UserDataAccessType{
 func (dataAccess UserDataAccessType) GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
 
-	error := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
 		return collection.FindOne(nil, bson.D{{Key: "username", Value: username}}).Decode(&user)
 	})
 	user.Password = ""
-	return &user, error
+	return &user, err
 }
 
 func (dataAccess UserDataAccessType) GetUserByEmail(email string) (*models.User, error) {
@@ -109,8 +109,8 @@ func (dataAccess UserDataAccessType) UpdateUser(user models.User) error {
 
 func (dataAccess UserDataAccessType) DeleteUserById(id string) error {
 	return dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
-		_, error := collection.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
-		return error
+		_, err := collection.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
+		return err
 	})
 }
 
