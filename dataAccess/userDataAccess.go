@@ -4,107 +4,69 @@ import (
 	"context"
 	"errors"
 	"log"
-	"os"
+	"ships/models"
 
-	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/crypto/bcrypt"
-
-	"ships/models"
 )
-
-var MongoUri = os.Getenv("MONGODB_URI")
-
-func init() {
-	log.Default()
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	MongoUri = os.Getenv("MONGODB_URI")
-	if MongoUri == "" {
-		log.Fatal("MONGODB_URI is not set in the environment variables")
-	}
-	log.Println("MongoUri loaded in DataAccess: " + MongoUri[:4] + "...")
-}
-
-func Test() {
-
-	user, err := GetUserByUsername("test")
-
-	log.Println("------------------------------")
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
-		log.Fatal("Error finding user:", err)
-	} else if errors.Is(err, mongo.ErrNoDocuments) {
-		log.Println("Connection works but no user found with username:", "jonbul")
-	} else if nil != user && nil == err {
-		log.Printf("User found with username: %s, email: %s\n", user.Username, user.Email)
-	} else if nil != err {
-		log.Printf("Something happened: %s\n", err.Error())
-	} else {
-		log.Println("¯\\_(ツ)_/¯")
-	}
-	log.Println("------------------------------")
-
-}
-
-func getCollection() *mongo.Collection {
-	client, err := mongo.Connect(options.Client().ApplyURI(MongoUri))
-	if err != nil && nil != client {
-		err := client.Disconnect(context.TODO())
-		if err != nil {
-			return nil
-		}
-		log.Fatal("Error connecting to MongoDB:", err)
-	}
-	if nil == client {
-		log.Fatal("Error connecting to MongoDB")
-	}
-
-	return client.Database("jaes", nil).Collection("users")
-}
 
 func GetUserByUsername(username string) (*models.User, error) {
 	var user models.User
-	coll := getCollection()
-	err := coll.FindOne(context.TODO(), bson.D{{Key: "username", Value: username}}).Decode(&user)
+
+	error := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		return collection.FindOne(nil, bson.D{{Key: "username", Value: username}}).Decode(&user)
+	})
 	user.Password = ""
-	return &user, err
+	return &user, error
 }
 
 func GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
-	coll := getCollection()
-	err := coll.FindOne(context.TODO(), bson.D{{Key: "email", Value: email}}).Decode(&user)
+	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		return collection.FindOne(nil, bson.D{{Key: "email", Value: email}}).Decode(&user)
+	})
+	user.Password = ""
+	return &user, err
+}
+
+func GetUserByID(id bson.ObjectID) (*models.User, error) {
+	var user models.User
+	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		return collection.FindOne(nil, bson.D{{Key: "_id", Value: id}}).Decode(&user)
+	})
+	user.Password = ""
 	return &user, err
 }
 
 func GetUserByEmailAndPassword(email string, password string) (*models.User, error) {
-	var user, err = GetUserByEmail(email)
+	var user *models.User
+	err := ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		return collection.FindOne(nil, bson.D{{Key: "email", Value: email}}).Decode(&user)
+	})
 	if err != nil || nil == user {
 		return nil, err
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Invalid password or username provided")
 	}
-
+	user.Password = ""
 	return user, nil
 }
 
-func GetUserByID(id string) (*models.User, error) {
-	var user models.User
-	coll := getCollection()
-	err := coll.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
-	return &user, err
-}
-
 func CreateUser(username string, email string, password string) (*models.User, error) {
-	coll := getCollection()
-	hasehdPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	registeredUser, err := GetUserByEmail(email)
+	if nil == err && registeredUser == nil {
+		registeredUser, err = GetUserByUsername(username)
+	}
+
+	if err == nil { // User or email already exist
+		return nil, errors.New("User already exists")
+	}
+
+	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
@@ -112,17 +74,34 @@ func CreateUser(username string, email string, password string) (*models.User, e
 		Admin:    false,
 		Username: username,
 		Email:    email,
-		Password: string(hasehdPwd),
+		Password: string(hashedPwd),
 		Credits:  0,
 		Kills:    0,
 		Deaths:   0,
 	}
-	_, err = coll.InsertOne(context.TODO(), user)
-	return &user, err
+
+	err = ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		_, err := collection.InsertOne(context.TODO(), user)
+		return err
+	})
+
+	if nil != err {
+		log.Fatal("Error inserting user:", err)
+		return nil, err
+	}
+	return &user, nil
 }
 
-func DeleteUser(id string) error {
-	coll := getCollection()
-	_, err := coll.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
-	return err
+func UpdateUser(user models.User) error {
+	return ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		_, err := collection.UpdateByID(context.TODO(), user.Id, bson.D{{Key: "$set", Value: user}})
+		return err
+	})
+}
+
+func DeleteUserById(id string) error {
+	return ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
+		_, error := collection.DeleteOne(context.TODO(), bson.D{{Key: "_id", Value: id}})
+		return error
+	})
 }

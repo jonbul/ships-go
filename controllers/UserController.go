@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"log"
+	"ships/models"
 	"time"
 
 	"net/http"
@@ -13,10 +14,10 @@ import (
 
 type BodyUser struct {
 	Email      string `json:"email"`
-	Username   string `json:"username"`
+	Username   string `json:"username" default:""`
 	Password   string `json:"password"`
-	Cpassword  string `json:"cpassword"`  // only register
-	RememberMe bool   `json:"rememberMe"` // only login
+	Cpassword  string `json:"cpassword" default:""`  // only register
+	RememberMe bool   `json:"rememberMe" default:""` // only login
 }
 
 func RegisterUserRoutes(router *gin.Engine) {
@@ -25,41 +26,55 @@ func RegisterUserRoutes(router *gin.Engine) {
 	router.POST("/register", registerUser)
 
 	router.POST("/login", loginUser)
+
+	router.GET("/userInfo", userInfo)
 	// Add more user-related routes here
 }
 
 func getStatus(c *gin.Context) {
+
 	c.IndentedJSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func userInfo(c *gin.Context) {
+
+	session, err := ValidateSession(c)
+	user, err := dataaccess.GetUserByID(session.UserIdAsBsonObject())
+	if err != nil {
+
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"user": user})
 }
 
 func registerUser(c *gin.Context) {
 	var user BodyUser
 	err := c.BindJSON(&user)
 	if nil != err {
-		_ = c.BindJSON(gin.H{"error": "invalid request body"})
+		_ = c.BindJSON(gin.H{"errors": "invalid request body"})
 	}
 	log.Printf("register user %s - %s", user.Email, user.Username)
 	if user.Username == "" || user.Password == "" || user.Password != user.Cpassword {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
 	}
 	dbUser, err := dataaccess.CreateUser(user.Username, user.Email, user.Password)
 
 	if nil != err || dbUser == nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": err.Error()})
+	} else {
+		c.IndentedJSON(http.StatusOK, gin.H{"success": true})
 	}
-
-	c.IndentedJSON(http.StatusOK, gin.H{"success": true})
 }
 
 func loginUser(c *gin.Context) {
 	var user BodyUser
 	err := c.BindJSON(&user)
 	if nil != err {
-		_ = c.BindJSON(gin.H{"error": "invalid request body"})
+		_ = c.BindJSON(gin.H{"errors": "invalid request body"})
 	}
-	log.Printf("register user %s", user.Email)
+	log.Printf("login user %s", user.Email)
 	if user.Email == "" || user.Password == "" {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
+		return
 	}
 
 	var expirationTime = int64(-1)
@@ -71,12 +86,30 @@ func loginUser(c *gin.Context) {
 	dbUser, err := dataaccess.GetUserByEmailAndPassword(user.Email, user.Password)
 
 	if nil != err || nil == dbUser {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"errors": "invalid request body"})
+		return
 	}
+
+	session := models.NewSession(dbUser.IdAsString(), dbUser.Admin, user.RememberMe)
+	err = dataaccess.InsertSession(session)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	c.SetCookie("token", session.Token, int(expirationTime/1000), "", "", true, true)
 
 	c.IndentedJSON(http.StatusOK, gin.H{
 		"success":        true,
 		"user":           dbUser,
 		"expirationTime": expirationTime,
 	})
+}
+
+func ValidateSession(c *gin.Context) (*models.Session, error) {
+	cookie, err := c.Cookie("token")
+	session, err := dataaccess.GetSessionByToken(cookie)
+	if nil != err || nil == session || session.IsExpired() {
+		return nil, err
+	}
+	return session, nil
 }

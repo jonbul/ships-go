@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"math/big"
 	"time"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 const SESSIONDURATION = 30 * 24 * 3600000
@@ -18,8 +20,20 @@ type Session struct {
 	ExpirationTime   int64  `json:"expirationTime"`
 }
 
-func NewSession(userId string, admin bool, persistent bool) *Session {
-	session := &Session{
+func (session *Session) UserIdAsBsonObject() bson.ObjectID {
+	id, _ := bson.ObjectIDFromHex(session.UserId)
+	return id
+}
+
+func (s Session) IsExpired() bool {
+	if s.Persistent {
+		return false
+	}
+	return s.ExpirationTime < time.Now().UnixMilli()
+}
+
+func NewSession(userId string, admin bool, persistent bool) Session {
+	session := Session{
 		Admin:            admin,
 		UserId:           userId,
 		SessionTimeStamp: time.Now().UnixMilli(),
@@ -35,16 +49,8 @@ func NewSession(userId string, admin bool, persistent bool) *Session {
 	return session
 }
 
-func isExpired(session *Session) bool {
-
-	if session.Persistent {
-		return false
-	}
-	return session.ExpirationTime < time.Now().UnixMilli()
-}
-
 func refeshToken(session *Session) string {
-	if !session.Persistent && !isExpired(session) {
+	if !session.Persistent && !session.IsExpired() {
 		session.Token = getNewBearerToken()
 		session.ExpirationTime = time.Now().UnixMilli() + SESSIONDURATION
 		// TODO save in mongo

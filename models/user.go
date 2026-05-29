@@ -1,15 +1,23 @@
 package models
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"golang.org/x/crypto/bcrypt"
+)
 
 type User struct {
-	Admin    bool   `json:"admin"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
-	Credits  int    `json:"credits"`
-	Kills    int    `json:"kills"`
-	Deaths   int    `json:"deaths"`
+	Id       bson.ObjectID `json:"_id" bson:"_id,omitempty"`
+	Admin    bool          `json:"admin"`
+	Username string        `json:"username"`
+	Password string        `json:"password"`
+	Email    string        `json:"email"`
+	Credits  int           `json:"credits"`
+	Kills    int           `json:"kills"`
+	Deaths   int           `json:"deaths"`
+}
+
+func (u *User) IdAsString() string {
+	return u.Id.Hex()
 }
 
 func (u *User) encryptPassword() {
