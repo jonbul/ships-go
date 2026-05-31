@@ -71,9 +71,9 @@ func (dataAccess PaintingBoardDataAccessType) DeleteProjectById(id bson.ObjectID
 	return err
 }
 
-func (dataAccess PaintingBoardDataAccessType) GetPublicShips() *[]models.PaintingProject {
+func (dataAccess PaintingBoardDataAccessType) GetPublicShips() (*[]models.PaintingProject, error) {
 	var ships = &[]models.PaintingProject{}
-	dataAccess.ExecuteSecurely(CollectionNames.ships(), func(collection mongo.Collection) error {
+	err := dataAccess.ExecuteSecurely(CollectionNames.ships(), func(collection mongo.Collection) error {
 		cursor, err := collection.Find(context.TODO(), bson.D{{}})
 		if nil != err {
 			return err
@@ -95,5 +95,5 @@ func (dataAccess PaintingBoardDataAccessType) GetPublicShips() *[]models.Paintin
 		}
 		return nil
 	})
-	return ships
+	return ships, err
 }

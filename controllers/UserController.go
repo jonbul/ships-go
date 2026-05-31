@@ -7,8 +7,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-
-	"ships/models"
 )
 
 type BodyUser struct {
@@ -98,7 +96,7 @@ func loginUser(c *gin.Context) {
 		return
 	}
 
-	session := models.NewSession(dbUser.IdAsString(), dbUser.Admin, user.RememberMe)
+	session := NewSession(dbUser.IdAsString(), dbUser.Admin, user.RememberMe)
 	err = sessionDataAccess.InsertSession(session)
 	if err != nil {
 		log.Fatal(err)

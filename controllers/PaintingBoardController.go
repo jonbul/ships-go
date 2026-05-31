@@ -43,7 +43,7 @@ func saveProject(c *gin.Context) {
 	user, err := userDataAccess.GetUserByID(session.UserIdAsBsonObject())
 
 	if nil != err || nil == user {
-		InvalidateSession(c)
+		invalidateSession(c)
 		return
 	}
 

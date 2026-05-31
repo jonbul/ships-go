@@ -68,6 +68,9 @@ func getUserShips(c *gin.Context) {
 }
 
 func getShips(c *gin.Context) {
-	ships := paintingBoardDataAccess.GetPublicShips()
+	ships, err := paintingBoardDataAccess.GetPublicShips()
+	if nil != err {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": []string{err.Error()}})
+	}
 	c.IndentedJSON(http.StatusOK, ships)
 }

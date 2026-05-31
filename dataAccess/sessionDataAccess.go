@@ -30,3 +30,11 @@ func (dataAccess SessionDataAccessType) GetSessionByToken(token string) (*models
 	})
 	return &session, err
 }
+
+func (dataAccess SessionDataAccessType) UpdateSession(session *models.Session) error {
+	return dataAccess.ExecuteSecurely(CollectionNames.sessions(), func(collection mongo.Collection) error {
+		_, err := collection.UpdateByID(context.Background(), session.Id, bson.M{"$set": session})
+		return err
+	})
+
+}
