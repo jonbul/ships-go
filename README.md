@@ -15,9 +15,9 @@ Only as audit
 Required for 1.0 and deploy
 
 - [ ] Learn GO
-- [ ] Create a https Rest API with access to Mongo DB
-  - [ ] Register user, login and delete
-  - [ ] Manage ships (return, edit, create)
+- [X] Create a https Rest API with access to Mongo DB
+  - [X] Register user, login and delete
+  - [X] Manage ships (return, edit, create)
 - [ ] Websocket to make the game working as works now in https://jonbul.ddns.net
 
 # env
