@@ -7,13 +7,13 @@ import (
 
 type User struct {
 	Id       bson.ObjectID `json:"_id" bson:"_id,omitempty"`
-	Admin    bool          `json:"admin"`
-	Username string        `json:"username"`
-	Password string        `json:"password"`
-	Email    string        `json:"email"`
-	Credits  int           `json:"credits"`
-	Kills    int           `json:"kills"`
-	Deaths   int           `json:"deaths"`
+	Admin    bool          `json:"admin" bson:"admin"`
+	Username string        `json:"username" bson:"username"`
+	Password string        `json:"password" bson:"password"`
+	Email    string        `json:"email" bson:"email"`
+	Credits  int           `json:"credits" bson:"credits"`
+	Kills    int           `json:"kills" bson:"kills"`
+	Deaths   int           `json:"deaths" bson:"deaths"`
 }
 
 func (u *User) IdAsString() string {

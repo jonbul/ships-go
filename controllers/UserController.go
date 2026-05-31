@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"ships/dataAccess"
 	"ships/models"
 )
 
@@ -19,9 +18,6 @@ type BodyUser struct {
 	Cpassword  string `json:"cpassword" default:""`  // only register
 	RememberMe bool   `json:"rememberMe" default:""` // only login
 }
-
-var userDataAccess = dataaccess.UserDataAccess
-var sessionDataAccess = dataaccess.SessionDataAccess
 
 func RegisterUserRoutes(router *gin.Engine) {
 	router.GET("/status", getStatus)
@@ -40,7 +36,7 @@ func getStatus(c *gin.Context) {
 
 func userInfo(c *gin.Context) {
 
-	session := ValidateSession(c)
+	session := GetSessionIfExist(c)
 	if nil == session || session.IsExpired() {
 		return
 	}
@@ -115,19 +111,4 @@ func loginUser(c *gin.Context) {
 		"user":           dbUser,
 		"expirationTime": expirationTime,
 	})
-}
-
-func ValidateSession(c *gin.Context) *models.Session {
-	cookie, err := c.Cookie("token")
-	session, err := sessionDataAccess.GetSessionByToken(cookie)
-	if nil != err || nil == session || session.IsExpired() {
-		InvalidateSession(c)
-		return nil
-	}
-	return session
-}
-
-func InvalidateSession(c *gin.Context) {
-	c.SetCookie("token", "", -1, "", "", true, true)
-	c.Redirect(http.StatusUnauthorized, "/login")
 }

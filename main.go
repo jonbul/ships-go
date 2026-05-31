@@ -36,6 +36,7 @@ func main() {
 	router.Use(cors.New(corsConfig))
 	controllers.RegisterUserRoutes(router)
 	controllers.RegisterPaintingBoardRoutes(router)
+	controllers.RegisterGameRoutes(router)
 	err = router.RunTLS(":3000", "./ssl/cert.pem", "./ssl/key.pem")
 	if err != nil {
 		log.Fatal("Error setting up SSH Server", err)

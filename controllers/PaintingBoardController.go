@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"net/http"
-	"ships/dataAccess"
 	"ships/models"
 
 	"github.com/gin-gonic/gin"
@@ -19,8 +18,6 @@ func RegisterPaintingBoardRoutes(router *gin.Engine) {
 	router.GET("/paintingBoard/projects/id", getProject)
 
 }
-
-var paintingBoardDataAccess = dataaccess.PaintingBoardDataAccess
 
 type Project struct {
 	Id      bson.ObjectID          `json:"_id" bson:"_id,omitempty"`

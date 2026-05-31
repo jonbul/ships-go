@@ -70,3 +70,30 @@ func (dataAccess PaintingBoardDataAccessType) DeleteProjectById(id bson.ObjectID
 	})
 	return err
 }
+
+func (dataAccess PaintingBoardDataAccessType) GetPublicShips() *[]models.PaintingProject {
+	var ships = &[]models.PaintingProject{}
+	dataAccess.ExecuteSecurely(CollectionNames.ships(), func(collection mongo.Collection) error {
+		cursor, err := collection.Find(context.TODO(), bson.D{{}})
+		if nil != err {
+			return err
+		}
+		for cursor.Next(context.TODO()) {
+			var ship models.PaintingProject
+			err := cursor.Decode(&ship)
+
+			if ship.Canvas.Width == 0 {
+				ship.Canvas.Width = ship.Width
+			}
+			if ship.Canvas.Height == 0 {
+				ship.Canvas.Height = ship.Height
+			}
+
+			if nil == err {
+				*ships = append(*ships, ship)
+			}
+		}
+		return nil
+	})
+	return ships
+}

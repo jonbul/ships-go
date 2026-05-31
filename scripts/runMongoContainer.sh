@@ -14,8 +14,9 @@ runMongoCommand() {
       --eval "var db = db.getSiblingDB('$1'); $2"
 }
 loadTestData() {
+    echo "Loading test data from ./dbTestData/*.json..."
     shopt -s nullglob
-    for file in ./testData/*.json; do
+    for file in ./dbTestData/*.json; do
         dbname=$(basename "$file" | cut -d. -f1)
         collection=$(basename "$file" | cut -d. -f2)
 
