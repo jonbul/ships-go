@@ -25,6 +25,10 @@ func RegisterUserRoutes(router *gin.Engine) {
 	router.POST("/login", loginUser)
 
 	router.GET("/userInfo", userInfo)
+
+	router.POST("/logout", logout)
+
+	router.POST("/refreshToken", refreshToken)
 }
 
 func getStatus(c *gin.Context) {
@@ -109,4 +113,31 @@ func loginUser(c *gin.Context) {
 		"user":           dbUser,
 		"expirationTime": expirationTime,
 	})
+}
+
+func logout(c *gin.Context) {
+	session := GetSessionIfExist(c)
+	if nil == session {
+		c.IndentedJSON(http.StatusOK, gin.H{"success": true})
+		return
+	}
+	session.Persistent = false
+	session.LoggedOut = true
+	err := sessionDataAccess.UpdateSession(session)
+	if nil != err {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false})
+		return
+	}
+	invalidateSession(c)
+	c.IndentedJSON(http.StatusOK, gin.H{"success": true})
+}
+
+func refreshToken(c *gin.Context) {
+	session := GetSessionIfExist(c)
+	if nil == session {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false})
+		return
+	}
+	RefreshToken(c, session)
+	c.IndentedJSON(http.StatusOK, gin.H{"success": true, "expirationTime": session.ExpirationTime})
 }

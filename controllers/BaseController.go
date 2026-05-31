@@ -23,7 +23,7 @@ func ValidateSession(c *gin.Context) *models.Session {
 		invalidateSession(c)
 		return nil
 	}
-	refreshToken(c, session)
+	RefreshToken(c, session)
 	return session
 }
 
@@ -40,7 +40,7 @@ func invalidateSession(c *gin.Context) {
 	c.SetCookie("token", "", -1, "", "", true, true)
 }
 
-func refreshToken(c *gin.Context, session *models.Session) {
+func RefreshToken(c *gin.Context, session *models.Session) {
 	if !session.Persistent && !session.IsExpired() {
 		session.Token = getNewBearerToken()
 		session.ExpirationTime = time.Now().UnixMilli() + SessionDuration
