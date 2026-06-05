@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"time"
 
@@ -16,6 +17,12 @@ var userConnections = make(map[string]*websocket.Conn)
 var playerStatus = make(map[string]*websocket.Conn)
 var playersToSend = []any{}
 var players = gin.H{}
+
+// backgroundCards
+// {x: {y : [xInCard, yInCard,size(1 to 5)]}}
+// {1: {1 : [1,2,3],2 : [1,2,3]}, 2: {1 : [1,2,3],2 : [1,2,3]...}...}
+
+var backgroundCards = make(map[int]map[int][]any)
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -37,7 +44,11 @@ func RegisterWebSocket(router *gin.Engine) {
 type wsEvent struct {
 	EventName string `json:"eventName" bson:"eventName"`
 	SocketId  string `json:"socketId" bson:"socketId"`
-	Data      any    `json:"data" bson:"data"`
+}
+type wsEventBackgroundCards struct {
+	EventName string     `json:"eventName" bson:"eventName"`
+	SocketId  string     `json:"socketId" bson:"socketId"`
+	Data      [25][2]int `json:"data" bson:"data"`
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -84,14 +95,45 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte) 
 		_ = json.Unmarshal(messageByte, &messageJson)
 		if nil != messageJson {
 			playersToSend = append(playersToSend, messageJson)
-			players[messageJson["socketId"].(string)] = messageJson
+			if nil != messageJson["socketId"] {
+				players[messageJson["socketId"].(string)] = messageJson
+			} else {
+				log.Println("Error parsing playersToSend -> " + string(messageByte))
+			}
 		}
 		return
 	case "getBackgroundCards":
-		// TODO
-		log.Println("--------------------------")
-		log.Println("Implementation pending: " + msg.EventName)
-		log.Println("--------------------------")
+		// TODO FIX THIS RETURNING MESSAGE AND DO A V2 OF THIS MESSAGE AFTER MIGRATION
+		// TODO This is done in this way for retrocompatibility but it's bullshit
+		var wsBgCards = wsEventBackgroundCards{}
+		_ = json.Unmarshal(messageByte, &wsBgCards)
+		result := []any{}
+		for card := range wsBgCards.Data {
+			var x = wsBgCards.Data[card][0]
+			var y = wsBgCards.Data[card][1]
+			bgcX, xOk := backgroundCards[x]
+			if !xOk {
+				bgcX = make(map[int][]any)
+				backgroundCards[x] = bgcX
+			}
+			_, yOk := backgroundCards[x][y]
+			if !yOk {
+
+				points := make([][3]int, 0, 500)
+				for i := 0; i < 500; i++ {
+					point := [3]int{
+						rand.IntN(canvasWidth),
+						rand.IntN(canvasHeight),
+						rand.IntN(4) + 1,
+					}
+					points = append(points, point)
+				}
+				backgroundCards[x][y] = []any{x, y, points}
+			}
+			result = append(result, backgroundCards[x][y])
+			//log.Println(fmt.Sprintf("Card %d: x=%d, y=%d, xInCard=%d, yInCard=%d, size=%d", card, x, y, bgcY[0], bgcY[1], bgcY[2]))
+		}
+		_ = conn.WriteJSON(gin.H{"eventName": msg.EventName, "socketId": msg.SocketId, "cards": result})
 		return
 	case "newBullet":
 		// TODO
