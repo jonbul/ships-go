@@ -13,6 +13,7 @@ func RegisterGameRoutes(router *gin.Engine) {
 	router.GET("/game/userShips", getUserShips)
 
 	router.GET("/game/getShips", getShips)
+	router.GET("/game/getPlayers", getPlayers)
 }
 
 var canvasWidth = 3840
@@ -20,12 +21,12 @@ var canvasHeight = 2160
 var guestsAllowed = true
 
 type gameData struct {
-	title         string `bson:"title"`
-	username      string `bson:"username"`
-	credits       int    `bson:"credits"`
-	canvasWidth   int    `bson:"canvasWidth"`
-	canvasHeight  int    `bson:"canvasHeight"`
-	guestsAllowed bool   `bson:"guestsAllowed"`
+	Title         string `json:"title" bson:"title"`
+	Username      string `json:"username" bson:"username"`
+	Credits       int    `json:"credits" bson:"credits"`
+	CanvasWidth   int    `json:"canvasWidth" bson:"canvasWidth"`
+	CanvasHeight  int    `json:"canvasHeight" bson:"canvasHeight"`
+	GuestsAllowed bool   `json:"guestsAllowed" bson:"guestsAllowed"`
 }
 
 func getGameData(c *gin.Context) {
@@ -35,16 +36,16 @@ func getGameData(c *gin.Context) {
 		user, _ = userDataAccess.GetUserByID(session.UserIdAsBsonObject())
 	}
 	data := gameData{
-		title:         "Game",
-		username:      "",
-		credits:       0,
-		canvasWidth:   canvasWidth,
-		canvasHeight:  canvasHeight,
-		guestsAllowed: guestsAllowed,
+		Title:         "Game",
+		Username:      "",
+		Credits:       0,
+		CanvasWidth:   canvasWidth,
+		CanvasHeight:  canvasHeight,
+		GuestsAllowed: guestsAllowed,
 	}
 	if user != nil {
-		data.username = user.Username
-		data.credits = user.Credits
+		data.Username = user.Username
+		data.Credits = user.Credits
 	}
 
 	c.IndentedJSON(http.StatusOK, data)
@@ -73,4 +74,8 @@ func getShips(c *gin.Context) {
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": []string{err.Error()}})
 	}
 	c.IndentedJSON(http.StatusOK, ships)
+}
+
+func getPlayers(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, players)
 }

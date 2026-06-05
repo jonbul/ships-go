@@ -37,10 +37,19 @@ func main() {
 	controllers.RegisterUserRoutes(router)
 	controllers.RegisterPaintingBoardRoutes(router)
 	controllers.RegisterGameRoutes(router)
-	err = router.RunTLS(":3000", "./ssl/cert.pem", "./ssl/key.pem")
+	controllers.RegisterWebSocket(router)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+
+	log.Println("Server is running on port " + port)
+
+	err = router.RunTLS(":"+port, "./ssl/cert.pem", "./ssl/key.pem")
 	if err != nil {
 		log.Fatal("Error setting up SSH Server", err)
 	}
 
-	log.Println("Server is running on port 3000")
+	_ = router.Run(":" + port)
+
 }

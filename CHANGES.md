@@ -11,4 +11,10 @@ Version 1.0.0 - 2026-XX-XX
   - MongoDB integration for data storage.
   - WIP:
     - [X] WebSocket for real-time game functionality (WIP).
+      - [X] Basic WebSocket implementation for game communication.
+      - [X] Players moving and see each other in real-time.
+      - [ ] Background cards (stars)
+      - [ ] Bullets visible and hitting other players.
+      - [ ] Players dead and respawning.
+      - [ ] Check animation works in all users at same time.
     - [ ] Grafana dashboard for monitoring (WIP).
