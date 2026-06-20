@@ -15,7 +15,7 @@ import (
 
 var userConnections = make(map[string]*websocket.Conn)
 var playerStatus = make(map[string]*websocket.Conn)
-var playersToSend = []*wsEvent{}
+var playersToSend = make(map[string]*wsEvent)
 var players = make(map[string]*wsEvent)
 var newBullets = []bullet{}
 var bulletsToRemove = []string{}
@@ -42,7 +42,7 @@ func RegisterWebSocket(router *gin.Engine) {
 		wsHandler(c.Writer, c.Request)
 	})
 	go broadCastInterval()
-	playersToSend = []*wsEvent{}
+	playersToSend = make(map[string]*wsEvent)
 }
 
 type wsEvent struct {
@@ -167,7 +167,7 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte, 
 	case "playerData":
 		if "" != socketId && "" != msg.SocketId {
 			msg.SocketId = socketId
-			playersToSend = append(playersToSend, msg)
+			playersToSend[socketId] = msg
 			players[socketId] = msg
 		}
 		return
@@ -251,7 +251,7 @@ func broadCastInterval() {
 		bulletsToRemove = []string{}
 		killsList = []*wsEvent{}
 		newBullets = []bullet{}
-		playersToSend = []*wsEvent{}
+		playersToSend = make(map[string]*wsEvent)
 		defer ticker.Stop()
 	}
 }
