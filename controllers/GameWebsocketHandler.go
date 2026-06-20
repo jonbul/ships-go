@@ -15,11 +15,11 @@ import (
 
 var userConnections = make(map[string]*websocket.Conn)
 var playerStatus = make(map[string]*websocket.Conn)
-var playersToSend = []any{}
-var players = gin.H{}
+var playersToSend = []*wsEvent{}
+var players = make(map[string]*wsEvent)
 var newBullets = []bullet{}
 var bulletsToRemove = []string{}
-var killsList = []wsEvent{}
+var killsList = []*wsEvent{}
 var hasPlayersTosend = false
 
 // backgroundCards
@@ -42,7 +42,7 @@ func RegisterWebSocket(router *gin.Engine) {
 		wsHandler(c.Writer, c.Request)
 	})
 	go broadCastInterval()
-	playersToSend = []any{}
+	playersToSend = []*wsEvent{}
 }
 
 type wsEvent struct {
@@ -50,8 +50,8 @@ type wsEvent struct {
 	SocketId  string     `json:"socketId" bson:"socketId"`
 	Data      [25][2]int `json:"data" bson:"data"`
 	Bullet    bullet     `json:"bullet" bson:"bullet"`
-	X         int        `json:"x" bson:"x"` // TODO REMOVE used in newBullet event
-	Y         int        `json:"y" bson:"y"` // TODO REMOVE used in newBullet event
+	X         float32    `json:"x" bson:"x"` // TODO REMOVE used in newBullet event
+	Y         float32    `json:"y" bson:"y"` // TODO REMOVE used in newBullet event
 
 	// TODO
 	//hitData    playerHitData `json:"playerHitData" bson:"playerHitData"`
@@ -61,23 +61,23 @@ type wsEvent struct {
 	BulletId     string  `json:"bulletId" bson:"bulletId"`         // TODO move to subclass playerHit
 	PlayerId     string  `json:"playerId" bson:"playerId"`         // TODO move to subclass playerHit
 	From         string  `json:"from" bson:"from"`                 // TODO move to subclass playerHit
-	BulletCharge float64 `json:"bulletCharge" bson:"bulletCharge"` // TODO move to subclass playerHit
+	BulletCharge float32 `json:"bulletCharge" bson:"bulletCharge"` // TODO move to subclass playerHit
 	// TODO move to subclass playerHit
 
 	// TODO moveToSubClass player
 	// x, y, socketId?, eventName?
 	Credits      int     `json:"credits" bson:"credits"`
-	Rotate       float64 `json:"rotate" bson:"rotate"`
+	Rotate       float32 `json:"rotate" bson:"rotate"`
 	Deaths       int     `json:"deaths" bson:"deaths"`
 	ShipId       string  `json:"shipId" bson:"shipId"`
 	IsDead       bool    `json:"isDead" bson:"isDead"`
 	Kills        int     `json:"kills" bson:"kills"`
 	Hide         bool    `json:"hidden" bson:"hidden"`
-	Scale        float64 `json:"scale" bson:"scale"`
-	YTranslation float64 `json:"yTranslation" bson:"yTranslation"`
+	Scale        float32 `json:"scale" bson:"scale"`
+	YTranslation float32 `json:"yTranslation" bson:"yTranslation"`
 	Name         string  `json:"name" bson:"name"`
-	Life         float64 `json:"life" bson:"life"`
-	Xtranslation float64 `json:"xTranslation" bson:"xTranslation"`
+	Life         float32 `json:"life" bson:"life"`
+	Xtranslation float32 `json:"xTranslation" bson:"xTranslation"`
 
 	// TODO moveToSubClass player
 }
@@ -87,38 +87,38 @@ type PlayerData struct {
 	X            int     `json:"x" bson:"x"`
 	Y            int     `json:"y" bson:"y"`
 	Credits      int     `json:"credits" bson:"credits"`
-	Rotate       float64 `json:"rotate" bson:"rotate"`
+	Rotate       float32 `json:"rotate" bson:"rotate"`
 	Deaths       int     `json:"deaths" bson:"deaths"`
 	ShipId       string  `json:"shipId" bson:"shipId"`
 	IsDead       bool    `json:"isDead" bson:"isDead"`
 	Kills        int     `json:"kills" bson:"kills"`
 	Hide         bool    `json:"hidden" bson:"hidden"`
-	Scale        float64 `json:"scale" bson:"scale"`
-	YTranslation float64 `json:"yTranslation" bson:"yTranslation"`
+	Scale        float32 `json:"scale" bson:"scale"`
+	YTranslation float32 `json:"yTranslation" bson:"yTranslation"`
 	Name         string  `json:"name" bson:"name"`
-	Life         float64 `json:"life" bson:"life"`
-	Xtranslation float64 `json:"xTranslation" bson:"xTranslation"`
+	Life         float32 `json:"life" bson:"life"`
+	Xtranslation float32 `json:"xTranslation" bson:"xTranslation"`
 }
 
 type playerHitData struct {
 	BulletId     string  `json:"bulletId" bson:"bulletId"`
 	PlayerId     string  `json:"playerId" bson:"playerId"`
 	From         string  `json:"from" bson:"from"`
-	BulletCharge float64 `json:"bulletCharge" bson:"bulletCharge"`
+	BulletCharge float32 `json:"bulletCharge" bson:"bulletCharge"`
 }*/
 
 type bullet struct {
-	Angle         float64 `json:"angle" bson:"angle"`
-	BulletCharge  float64 `json:"bulletCharge" bson:"bulletCharge"`
-	ExpY          float64 `json:"expY" bson:"expY"`
-	ExpX          float64 `json:"expX" bson:"expX"`
+	Angle         float32 `json:"angle" bson:"angle"`
+	BulletCharge  float32 `json:"bulletCharge" bson:"bulletCharge"`
+	ExpY          float32 `json:"expY" bson:"expY"`
+	ExpX          float32 `json:"expX" bson:"expX"`
 	Id            string  `json:"id" bson:"id"`
-	MoveX         float64 `json:"moveX" bson:"moveX"`
-	MoveY         float64 `json:"moveY" bson:"moveY"`
-	Rotation      float64 `json:"rotation" bson:"rotation"`
-	ShootingSpeed float64 `json:"shootingSpeed" bson:"shootingSpeed"`
-	X             float64 `json:"x" bson:"x"`
-	Y             float64 `json:"y" bson:"y"`
+	MoveX         float32 `json:"moveX" bson:"moveX"`
+	MoveY         float32 `json:"moveY" bson:"moveY"`
+	Rotation      float32 `json:"rotation" bson:"rotation"`
+	ShootingSpeed float32 `json:"shootingSpeed" bson:"shootingSpeed"`
+	X             float32 `json:"x" bson:"x"`
+	Y             float32 `json:"y" bson:"y"`
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,12 +128,16 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error upgrading:", err)
 		return
 	}
-	defer func(conn *websocket.Conn) {
+
+	socketId := uuid.New().String()
+	defer func(conn *websocket.Conn, socketId string) {
 		err := conn.Close()
 		if err != nil {
 			log.Println("Error closing connection:", err)
 		}
-	}(conn)
+		delete(userConnections, socketId)
+	}(conn, socketId)
+	userConnections[socketId] = conn
 	//defer conn.Close()
 	// Listen for incoming messages
 	for {
@@ -147,29 +151,24 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Printf("Received: %s\n", msg.EventName)
 
-		manageInputMessage(conn, &msg, messagePlain)
+		manageInputMessage(conn, &msg, messagePlain, socketId)
 	}
 }
 
-func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte) {
+func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte, socketId string) {
 	switch msg.EventName {
 	case "connectionSuccess":
-		socketId := uuid.New().String()
+		//socketId := uuid.New().String()
 		log.Println("New connection with socketId: " + socketId)
 		userConnections[socketId] = conn
-		_ = conn.WriteJSON(wsEvent{EventName: "connectionSuccess", SocketId: socketId})
+		msg.SocketId = socketId
+		_ = conn.WriteJSON(msg)
 		return
 	case "playerData":
-		// string to generic json
-		var playerEvent map[string]any
-		_ = json.Unmarshal(messageByte, &playerEvent)
-		if nil != playerEvent {
-			playersToSend = append(playersToSend, playerEvent)
-			if nil != playerEvent["socketId"] {
-				players[playerEvent["socketId"].(string)] = playerEvent
-			} else {
-				log.Println("Error parsing playersToSend -> " + string(messageByte))
-			}
+		if "" != socketId && "" != msg.SocketId {
+			msg.SocketId = socketId
+			playersToSend = append(playersToSend, msg)
+			players[socketId] = msg
 		}
 		return
 	case "getBackgroundCards":
@@ -187,9 +186,11 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte) 
 		userConnections[msg.PlayerId].WriteJSON(msg)
 		return
 	case "playerDied":
-		killsList = append(killsList, *msg)
-		if players[msg.From] != nil {
+		killsList = append(killsList, msg)
+		playerFrom, ok := players[msg.From]
+		if ok {
 			hasPlayersTosend = true
+			playerFrom.Credits += 100
 		}
 	default:
 		log.Println("--------------------------")
@@ -248,9 +249,9 @@ func broadCastInterval() {
 			_ = c.WriteJSON(json)
 		}
 		bulletsToRemove = []string{}
-		killsList = []wsEvent{}
+		killsList = []*wsEvent{}
 		newBullets = []bullet{}
-		playersToSend = []any{}
+		playersToSend = []*wsEvent{}
 		defer ticker.Stop()
 	}
 }
