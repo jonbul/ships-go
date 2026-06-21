@@ -38,6 +38,7 @@ func main() {
 	controllers.RegisterPaintingBoardRoutes(router)
 	controllers.RegisterGameRoutes(router)
 	controllers.RegisterWebSocket(router)
+	controllers.RegisterPrometheusRoutes(router)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
