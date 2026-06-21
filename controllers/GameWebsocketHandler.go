@@ -149,13 +149,12 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("Error reading message:", err)
 			break
 		}
-		fmt.Printf("Received: %s\n", msg.EventName)
 
-		manageInputMessage(conn, &msg, messagePlain, socketId)
+		manageInputMessage(conn, &msg, socketId)
 	}
 }
 
-func manageInputMessage(conn *websocket.Conn, msg *wsEvent, messageByte []byte, socketId string) {
+func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
 	switch msg.EventName {
 	case "connectionSuccess":
 		//socketId := uuid.New().String()
@@ -232,7 +231,6 @@ func wsGetBackgroundCards(conn *websocket.Conn, wsBgCards *wsEvent) {
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
 	for range ticker.C {
-		//log.Println(fmt.Sprintf("Sending event: %s", eventName))
 		if len(playersToSend)+len(newBullets)+len(killsList) == 0 {
 			continue
 		}

@@ -14,7 +14,7 @@ Version 1.0.0 - 2026-XX-XX
       - [X] Basic WebSocket implementation for game communication.
       - [X] Players moving and see each other in real-time.
       - [X] Background cards (stars)
-      - [ ] Bullets visible and hitting other players.
-      - [ ] Players dead and respawning.
-      - [ ] Check animation works in all users at same time.
+      - [X] Bullets visible and hitting other players.
+      - [X] Players dead and respawning.
+      - [X] Check animation works in all users at same time.
     - [ ] Grafana dashboard for monitoring (WIP).
