@@ -26,7 +26,7 @@ var hasPlayersTosend = false
 // {x: {y : [xInCard, yInCard,size(1 to 5)]}}
 // {1: {1 : [1,2,3],2 : [1,2,3]}, 2: {1 : [1,2,3],2 : [1,2,3]...}...}
 
-var backgroundCards = make(map[int]map[int][]any)
+var BackgroundCards = make(map[int]map[int][]any)
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -203,12 +203,12 @@ func wsGetBackgroundCards(conn *websocket.Conn, wsBgCards *wsEvent) {
 	for card := range wsBgCards.Data {
 		var x = wsBgCards.Data[card][0]
 		var y = wsBgCards.Data[card][1]
-		bgcX, xOk := backgroundCards[x]
+		bgcX, xOk := BackgroundCards[x]
 		if !xOk {
 			bgcX = make(map[int][]any)
-			backgroundCards[x] = bgcX
+			BackgroundCards[x] = bgcX
 		}
-		_, yOk := backgroundCards[x][y]
+		_, yOk := BackgroundCards[x][y]
 		if !yOk {
 
 			points := make([][3]int, 0, 500)
@@ -220,9 +220,9 @@ func wsGetBackgroundCards(conn *websocket.Conn, wsBgCards *wsEvent) {
 				}
 				points = append(points, point)
 			}
-			backgroundCards[x][y] = []any{x, y, points}
+			BackgroundCards[x][y] = []any{x, y, points}
 		}
-		result = append(result, backgroundCards[x][y])
+		result = append(result, BackgroundCards[x][y])
 		//log.Println(fmt.Sprintf("Card %d: x=%d, y=%d, xInCard=%d, yInCard=%d, size=%d", card, x, y, bgcY[0], bgcY[1], bgcY[2]))
 	}
 	_ = conn.WriteJSON(gin.H{"eventName": wsBgCards.EventName, "socketId": wsBgCards.SocketId, "cards": result})

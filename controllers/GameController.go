@@ -14,6 +14,7 @@ func RegisterGameRoutes(router *gin.Engine) {
 
 	router.GET("/game/getShips", getShips)
 	router.GET("/game/getPlayers", getPlayers)
+	router.POST("/gameData", getAdminGameData)
 }
 
 var canvasWidth = 3840
@@ -78,4 +79,39 @@ func getShips(c *gin.Context) {
 
 func getPlayers(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, players)
+}
+
+func getAdminGameData(c *gin.Context) {
+	session := ValidateSession(c)
+	if nil == session {
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"success": false, "errors": []string{"Unauthorized"}})
+		return
+	}
+
+	user, err := userDataAccess.GetUserByID(session.UserIdAsBsonObject())
+	if nil != err {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"success": false, "errors": []string{err.Error()}})
+		return
+	}
+	if !user.Admin {
+		c.IndentedJSON(http.StatusUnauthorized, gin.H{"success": false, "errors": []string{"Unauthorized"}})
+		return
+	}
+
+	var resultCards = make(map[int]map[int]any)
+
+	for x, arrX := range BackgroundCards {
+		resultCards[x] = make(map[int]any)
+		for y := range arrX {
+			resultCards[x][y] = []any{
+				BackgroundCards[x][y][0],
+				BackgroundCards[x][y][1],
+			}
+		}
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{
+		"players":     players,
+		"resultCards": resultCards,
+	})
 }
