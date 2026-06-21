@@ -1,4 +1,5 @@
 .idea
 .env
+ships // 
 ssl/*
 __debug_bin*
