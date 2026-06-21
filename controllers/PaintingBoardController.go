@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
-func RegisterPaintingBoardRoutes(router *gin.Engine) {
+func registerPaintingBoardRoutes(router *gin.Engine) {
 	router.GET("/paintingBoard/projects/all", getProjects)
 
 	router.POST("/paintingBoard/save", saveProject)

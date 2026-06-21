@@ -16,6 +16,15 @@ var paintingBoardDataAccess = dataaccess.PaintingBoardDataAccess
 var sessionDataAccess = dataaccess.SessionDataAccess
 var userDataAccess = dataaccess.UserDataAccess
 
+func RegisterRoutes(router *gin.Engine) {
+	registerUserRoutes(router)
+	registerPaintingBoardRoutes(router)
+	registerGameRoutes(router)
+	registerWebSocket(router)
+	registerAdminRoutes(router)
+	registerPrometheusRoutes(router)
+}
+
 func ValidateSession(c *gin.Context) *models.Session {
 	cookie, err := c.Cookie("token")
 	session, err := sessionDataAccess.GetSessionByToken(cookie)

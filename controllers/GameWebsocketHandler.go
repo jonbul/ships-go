@@ -36,7 +36,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func RegisterWebSocket(router *gin.Engine) {
+func registerWebSocket(router *gin.Engine) {
 	// TODO change to /ws after 1.0
 	router.GET("/", func(c *gin.Context) {
 		wsHandler(c.Writer, c.Request)
@@ -212,10 +212,13 @@ func wsGetBackgroundCards(conn *websocket.Conn, wsBgCards *wsEvent) {
 		if !yOk {
 
 			points := make([][3]int, 0, 500)
+			rw := resolutions[currentResolution].Width
+			rh := resolutions[currentResolution].Height
+
 			for i := 0; i < 500; i++ {
 				point := [3]int{
-					rand.IntN(canvasWidth),
-					rand.IntN(canvasHeight),
+					rand.IntN(rw),
+					rand.IntN(rh),
 					rand.IntN(4) + 1,
 				}
 				points = append(points, point)

@@ -34,11 +34,7 @@ func main() {
 	corsConfig.AddAllowHeaders("Authorization")
 	corsConfig.AddAllowMethods("GET", "POST", "PUT", "PATCH", "OPTIONS")
 	router.Use(cors.New(corsConfig))
-	controllers.RegisterUserRoutes(router)
-	controllers.RegisterPaintingBoardRoutes(router)
-	controllers.RegisterGameRoutes(router)
-	controllers.RegisterWebSocket(router)
-	controllers.RegisterPrometheusRoutes(router)
+	controllers.RegisterRoutes(router)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"

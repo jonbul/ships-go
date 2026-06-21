@@ -17,7 +17,7 @@ type BodyUser struct {
 	RememberMe bool   `json:"rememberMe" default:""` // only login
 }
 
-func RegisterUserRoutes(router *gin.Engine) {
+func registerUserRoutes(router *gin.Engine) {
 	router.GET("/status", getStatus)
 
 	router.POST("/register", registerUser)
