@@ -1,5 +1,12 @@
-.idea
+#env
 .env
-ships // 
+
+# build file
+ships 
+
+#certs
 ssl/*
+
+# Others
 __debug_bin*
+.idea
