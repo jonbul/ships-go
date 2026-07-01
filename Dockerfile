@@ -1,4 +1,4 @@
-FROM golang:1.26
+FROM golang:1.26.2
 
 WORKDIR /usr/src/app
 
@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -v -o /usr/src/app ./...
+RUN go build -v -o /usr/local/bin/app ./...
 
 EXPOSE 3000
 

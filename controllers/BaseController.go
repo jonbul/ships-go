@@ -1,10 +1,11 @@
 package controllers
 
 import (
-	"crypto/rand"
-	"math/big"
 	dataaccess "ships/dataAccess"
 	"ships/models"
+
+	"crypto/rand"
+	"math/big"
 	"time"
 
 	"github.com/gin-gonic/gin"
