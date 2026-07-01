@@ -38,6 +38,6 @@ echo ____________________ NUEVO DOCKER
 docker build -t $IMAGE_NAME .
 
 
-docker run -d -p 3000:3000 --name $CONTAINER_NAME -v /home/jonbul/servers/files/ssl:/ssl $IMAGE_NAME
+docker run -d -p 3000:3000 --name $CONTAINER_NAME -v /home/jonbul/servers/files/ssl:/app/ssl $IMAGE_NAME
 
 docker ps -a
