@@ -60,10 +60,38 @@ fi
 
 # Check if the mongodb container is already running, if not, run it
 if [ "$(docker ps -aq -f name=mongodb)" ]; then
-    echo "MongoDB container already exists (running or stopped). Do you want to recreate it? (y/n)"
+    if [ "$(docker ps -q -f name=mongodb -f status=running)" ]; then
+        container_state="running"
+    elif [ "$(docker ps -q -f name=mongodb -f status=paused)" ]; then
+        container_state="paused"
+    else
+        container_state="stopped"
+    fi
+    echo "MongoDB container already exists ($container_state). What do you want to do?"
+    echo "1) Stop and remove the existing container and start a new one"
+    if [ "$container_state" = "running" ]; then
+        echo "2) Stop the existing container and exit"
+    elif [ "$container_state" = "paused" ]; then
+        echo "2) Unpause the existing container and exit"
+    else
+        echo "2) Start the existing container and exit"
+    fi
+    echo "3) Exit without doing anything"
     read answer
-    if [ "$answer" = "y" ]; then
+    if [ "$answer" = "1" ]; then
         killAndRemoveContainer
+    elif [ "$answer" = "2" ]; then
+        if [ "$container_state" = "running" ]; then
+            echo "Stopping existing MongoDB container..."
+            docker stop mongodb
+        elif [ "$container_state" = "paused" ]; then
+            echo "Unpausing existing MongoDB container..."
+            docker unpause mongodb
+        else
+            echo "Starting existing MongoDB container..."
+            docker start mongodb
+        fi
+        exit 0
     else
         echo "Exiting..."
         exit 0

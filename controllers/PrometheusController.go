@@ -17,12 +17,15 @@ func registerPrometheusRoutes(router *gin.Engine) {
 
 	router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
 
-	srv, _ := statsviz.NewServer()
-	router.GET("/status/*filepath", func(c *gin.Context) {
+	srv, _ := statsviz.NewServer(statsviz.Root("/vi/status"))
+	ws := srv.Ws()
+	index := srv.Index()
+
+	router.GET("/vi/status/*filepath", func(c *gin.Context) {
 		if c.Param("filepath") == "/ws" {
-			srv.Ws()(c.Writer, c.Request)
+			ws(c.Writer, c.Request)
 			return
 		}
-		srv.Index()(c.Writer, c.Request)
+		index(c.Writer, c.Request)
 	})
 }
