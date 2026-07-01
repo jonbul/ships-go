@@ -42,9 +42,9 @@ func main() {
 
 	log.Println("Server is running on port " + port)
 
-	err = router.RunTLS(":"+port, "./ssl/cert.pem", "./ssl/key.pem")
+	err = router.RunTLS(":"+port, os.Getenv("SSL_CERT_PATH"), os.Getenv("SSL_KEY_PATH"))
 	if err != nil {
-		log.Fatal("Error setting up SSH Server", err)
+		log.Fatal("Error setting up SSL Server", err)
 	}
 
 	_ = router.Run(":" + port)
