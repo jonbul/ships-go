@@ -9,6 +9,7 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "master" ]
+    types: [opened, synchronize, reopened]
 
 jobs:
 
@@ -40,7 +41,16 @@ jobs:
       with:
         files: ships
 
-    - name: Create snapshot release
+    - name: Create PR snapshot
+      if: github.event_name == 'pull_request'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: pr-${{ github.event.pull_request.number }}-snapshot
+        name: PR #${{ github.event.pull_request.number }} Snapshot
+        prerelease: true
+        files: ships
+
+    - name: Create latest snapshot
       if: github.ref == 'refs/heads/master'
       uses: softprops/action-gh-release@v2
       with:
