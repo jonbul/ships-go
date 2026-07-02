@@ -1,6 +1,5 @@
 #!/bin/sh
 set -x # show comands in execution
-set -e # exit on error
 
 #which docker
 docker ps -a
@@ -15,7 +14,9 @@ echo ____________________ BORRAR DOCKER
 docker rm $CONTAINER_NAME
 echo ____________________ BORRAR IMAGEN DOCKER
 docker rmi $IMAGE_NAME:latest
-echo ____________________ CLONAR REPO
+
+set -e # exit on error
+
 cd /home/jonbul/servers
 
 CARPETA="ships-go"
@@ -27,7 +28,17 @@ fi
 
 #Download build file
 cd $CARPETA
-curl -L https://github.com/jonbul/ships-go/releases/latest/download/ships -o ships
+#ask for the latest release from github or snapshot
+echo "Do you want to download the latest release or the latest snapshot?"
+echo "1 release"
+echo "2 snapshot"
+read answer
+
+if [ "$answer" -eq 1 ]; then
+    curl -L --fail https://github.com/jonbul/ships-go/releases/latest/download/ships -o ships
+elif [ "$answer" -eq 2 ]; then
+    curl -L --fail https://github.com/jonbul/ships-go/releases/download/latest-snapshot/ships -o ships
+fi
 chmod +x ships
 
 
