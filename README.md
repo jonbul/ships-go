@@ -8,7 +8,7 @@ This is a project migrated from Express.js
 
 # Use of AI
 
-Only as audit
+Only for audit
 
 # TODO
 
@@ -18,7 +18,10 @@ Required for 1.0 and deploy
 - [X] Create a https Rest API with access to Mongo DB
   - [X] Register user, login and delete
   - [X] Manage ships (return, edit, create)
-- [ ] Websocket to make the game working as works now in https://jonbul.ddns.net
+- [X] Websocket to make the game working as works now in https://jonbul.ddns.net
+
+# For the Future
+- Gravitational objects
 
 # env
 
