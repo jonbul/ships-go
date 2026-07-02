@@ -147,6 +147,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(messagePlain, &msg)
 		if err != nil {
 			fmt.Println("Error reading message:", err)
+			fmt.Println(messagePlain)
 			break
 		}
 
