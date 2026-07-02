@@ -20,3 +20,4 @@ Version 1.0.0 - 2026-06-XX
     - [X] Monitoring.
   - BUGS:
     - [ ] Disconnected users aren't removed propperly
+    
