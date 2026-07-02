@@ -40,5 +40,14 @@ jobs:
       with:
         files: ships
 
+    - name: Create snapshot release
+      if: github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest-snapshot
+        name: Latest Snapshot
+        prerelease: true
+        files: ships
+
     #- name: Test
     #  run: go test -v ./...
