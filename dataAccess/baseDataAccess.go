@@ -48,7 +48,14 @@ type baseDataAccess struct{}
 var BaseDataAccess = baseDataAccess{}
 
 func (baseDataAccess) getClient() *mongo.Client {
-	client, err := mongo.Connect(options.Client().ApplyURI(MongoUri))
+	bsonOpts := &options.BSONOptions{
+		AllowTruncatingDoubles: true,
+	}
+
+	client, err := mongo.Connect(
+		options.Client().
+			ApplyURI(MongoUri).
+			SetBSONOptions(bsonOpts))
 	if err != nil && nil != client {
 		err := client.Disconnect(context.TODO())
 		if err != nil {

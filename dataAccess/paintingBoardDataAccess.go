@@ -24,14 +24,7 @@ func (dataAccess PaintingBoardDataAccessType) GetProjectsByUserId(userId string)
 			return err
 		}
 
-		for cursor.Next(context.TODO()) {
-			var project models.PaintingProject
-			err := cursor.Decode(&project)
-			if nil != err {
-				return err
-			}
-			*result = append(*result, project)
-		}
+		err = cursor.All(context.TODO(), result)
 
 		return err
 	})
@@ -78,19 +71,17 @@ func (dataAccess PaintingBoardDataAccessType) GetPublicShips() (*[]models.Painti
 		if nil != err {
 			return err
 		}
-		for cursor.Next(context.TODO()) {
-			var ship models.PaintingProject
-			err := cursor.Decode(&ship)
+
+		err = cursor.All(context.TODO(), ships)
+
+		for i := range *ships {
+			ship := &(*ships)[i]
 
 			if ship.Canvas.Width == 0 {
 				ship.Canvas.Width = ship.Width
 			}
 			if ship.Canvas.Height == 0 {
 				ship.Canvas.Height = ship.Height
-			}
-
-			if nil == err {
-				*ships = append(*ships, ship)
 			}
 		}
 		return nil
