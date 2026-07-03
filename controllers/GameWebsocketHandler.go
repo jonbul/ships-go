@@ -136,9 +136,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Error closing connection:", err)
 		}
 		delete(userConnections, socketId)
+		delete(players, socketId)
 	}(conn, socketId)
 	userConnections[socketId] = conn
-	//defer conn.Close()
 	// Listen for incoming messages
 	for {
 		// Read message from the client
@@ -146,10 +146,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		_, messagePlain, err := conn.ReadMessage()
 		_ = json.Unmarshal(messagePlain, &msg)
 		if err != nil {
-			fmt.Println("Error reading message:", err)
-			fmt.Println("Closing connection for socketId:", socketId)
-			_ = conn.Close()
-			delete(userConnections, socketId)
 			break
 		}
 
