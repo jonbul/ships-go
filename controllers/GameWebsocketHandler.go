@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var mu sync.Mutex
 var userConnections = make(map[string]*websocket.Conn)
 var playerStatus = make(map[string]*websocket.Conn)
 var playersToSend = make(map[string]*wsEvent)
@@ -135,10 +137,14 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println("Error closing connection:", err)
 		}
+		mu.Lock() // to ensure thread safety when modifying the maps
 		delete(userConnections, socketId)
 		delete(players, socketId)
+		mu.Unlock()
 	}(conn, socketId)
+	mu.Lock()
 	userConnections[socketId] = conn
+	mu.Unlock()
 	// Listen for incoming messages
 	for {
 		// Read message from the client
@@ -156,17 +162,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
 	switch msg.EventName {
 	case "connectionSuccess":
-		//socketId := uuid.New().String()
 		log.Println("New connection with socketId: " + socketId)
+		mu.Lock()
 		userConnections[socketId] = conn
+		mu.Unlock()
 		msg.SocketId = socketId
 		_ = conn.WriteJSON(msg)
 		return
 	case "playerData":
 		if "" != socketId && "" != msg.SocketId {
 			msg.SocketId = socketId
+			mu.Lock()
 			playersToSend[socketId] = msg
 			players[socketId] = msg
+			mu.Unlock()
 		}
 		return
 	case "getBackgroundCards":
@@ -175,21 +184,32 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
 		wsGetBackgroundCards(conn, msg)
 		return
 	case "newBullet":
+		mu.Lock()
 		newBullets = append(newBullets, msg.Bullet)
+		mu.Unlock()
 		return
 	case "removeBullet":
+		mu.Lock()
 		bulletsToRemove = append(bulletsToRemove, msg.BulletId)
+		mu.Unlock()
 		return
 	case "playerHit":
-		userConnections[msg.PlayerId].WriteJSON(msg)
+		mu.Lock()
+		targetConn := userConnections[msg.PlayerId]
+		mu.Unlock()
+		if targetConn != nil {
+			_ = targetConn.WriteJSON(msg)
+		}
 		return
 	case "playerDied":
+		mu.Lock()
 		killsList = append(killsList, msg)
 		playerFrom, ok := players[msg.From]
 		if ok {
 			hasPlayersTosend = true
 			playerFrom.Credits += 100
 		}
+		mu.Unlock()
 	default:
 		log.Println("--------------------------")
 		log.Println("Unknown event: " + msg.EventName)
@@ -232,26 +252,34 @@ func wsGetBackgroundCards(conn *websocket.Conn, wsBgCards *wsEvent) {
 
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
+	defer ticker.Stop()
 	for range ticker.C {
+		mu.Lock()
 		if len(playersToSend)+len(newBullets)+len(killsList) == 0 {
+			mu.Unlock()
 			continue
 		}
 
-		var json = map[string]any{
+		var payload = map[string]any{
 			"eventName":       "gameBroadcast",
-			"bulletsToRemove": bulletsToRemove, // TODO
-			"newBullets":      newBullets,      // TODO
+			"bulletsToRemove": bulletsToRemove,
+			"newBullets":      newBullets,
 			"players":         playersToSend,
-			"kills":           killsList, // TODO
+			"kills":           killsList,
 		}
 
+		conns := make([]*websocket.Conn, 0, len(userConnections))
 		for _, c := range userConnections {
-			_ = c.WriteJSON(json)
+			conns = append(conns, c)
 		}
 		bulletsToRemove = []string{}
 		killsList = []*wsEvent{}
 		newBullets = []bullet{}
 		playersToSend = make(map[string]*wsEvent)
-		defer ticker.Stop()
+		mu.Unlock()
+
+		for _, c := range conns {
+			_ = c.WriteJSON(payload)
+		}
 	}
 }
