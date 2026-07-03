@@ -23,7 +23,7 @@ func (dataAccess UserDataAccessType) GetUserByUsername(username string) (*models
 	var user models.User
 
 	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
-		return collection.FindOne(nil, bson.D{{Key: "username", Value: username}}).Decode(&user)
+		return collection.FindOne(context.TODO(), bson.D{{Key: "username", Value: username}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, err
@@ -32,7 +32,7 @@ func (dataAccess UserDataAccessType) GetUserByUsername(username string) (*models
 func (dataAccess UserDataAccessType) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
-		return collection.FindOne(nil, bson.D{{Key: "email", Value: email}}).Decode(&user)
+		return collection.FindOne(context.TODO(), bson.D{{Key: "email", Value: email}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, err
@@ -41,7 +41,7 @@ func (dataAccess UserDataAccessType) GetUserByEmail(email string) (*models.User,
 func (dataAccess UserDataAccessType) GetUserByID(id bson.ObjectID) (*models.User, error) {
 	var user models.User
 	err := dataAccess.ExecuteSecurely(CollectionNames.users(), func(collection mongo.Collection) error {
-		return collection.FindOne(nil, bson.D{{Key: "_id", Value: id}}).Decode(&user)
+		return collection.FindOne(context.TODO(), bson.D{{Key: "_id", Value: id}}).Decode(&user)
 	})
 	user.Password = ""
 	return &user, err
