@@ -23,7 +23,7 @@ func RegisterRoutes(router *gin.Engine) {
 	registerGameRoutes(router)
 	registerWebSocket(router)
 	registerAdminRoutes(router)
-	registerPrometheusRoutes(router)
+	//RegisterPrometheusRoutes(router)
 }
 
 func ValidateSession(c *gin.Context) *models.Session {

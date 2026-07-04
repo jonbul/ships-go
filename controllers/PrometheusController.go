@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func registerPrometheusRoutes(router *gin.Engine) {
+func RegisterPrometheusRoutes(router *gin.Engine) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
 		collectors.NewGoCollector(),
