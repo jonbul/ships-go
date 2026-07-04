@@ -56,7 +56,7 @@ COPY ships .
 RUN chmod +x ships
 
 # Expone el puerto 3000
-EXPOSE 3000
+EXPOSE 3000 3001
 
 # Ejecuta la aplicación
 CMD ["./ships"]
@@ -65,7 +65,7 @@ EOF
 echo ____________________ NUEVO DOCKER
 docker build -t $IMAGE_NAME .
 
-docker run -d -p 3000:3000 --name $CONTAINER_NAME \
+docker run -d -p 3000:3000 -p 3001:3001 --name $CONTAINER_NAME \
  -v /home/jonbul/servers/files/ssl:/ssl \
  -v /home/jonbul/servers/files/.env:/app/.env $IMAGE_NAME
 

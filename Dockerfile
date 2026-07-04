@@ -9,6 +9,6 @@ RUN go mod download
 COPY . .
 RUN go build -v -o /app ./...
 
-EXPOSE 3000
+EXPOSE 3000 3001
 
 CMD ["/app/ships"]
