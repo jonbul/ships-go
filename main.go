@@ -80,7 +80,7 @@ func buildAdminWebServer() {
 
 	g.Go(func() error {
 		println("Admin server is running on port " + adminPort)
-		return adminRouter.Run(":" + adminPort)
+		return adminRouter.Run("0.0.0.0:" + adminPort)
 	})
 
 	errG := g.Wait()
