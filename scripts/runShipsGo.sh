@@ -4,7 +4,7 @@ set -x # show comands in execution
 #which docker
 docker ps -a
 CONTAINER_NAME="ships-go"
-IMAGE_NAME="ships-go"
+IMAGE_NAME="ships-go-image"
 
 
 echo "Usuario actual: $(whoami)"
