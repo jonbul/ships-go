@@ -1,1 +1,12 @@
+#env
 .env
+
+# build file
+ships 
+
+#certs
+ssl/*
+
+# Others
+__debug_bin*
+.idea

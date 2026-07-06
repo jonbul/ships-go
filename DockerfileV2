@@ -1,0 +1,18 @@
+FROM alpine:3.19
+
+# Instala certificados por si tu app hace peticiones HTTPS
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+
+# Copia el binario compilado localmente por el script
+COPY ships .
+
+# Asegura permisos de ejecución para el binario
+RUN chmod +x ships
+
+# Expone el puerto 8080
+EXPOSE 8080
+
+# Ejecuta la aplicación
+CMD ["./ships"]

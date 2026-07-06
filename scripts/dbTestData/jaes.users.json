@@ -1,0 +1,13 @@
+[{
+  "_id": {
+    "$oid": "5f33b5e7601ad069b093cc6a"
+  },
+  "email": "test@test.com",
+  "username": "test",
+  "password": "$2a$10$FVtpD8/iTmMUae.oQLsGAeaoNku4dW7ZkYXIxmZuAUQmufkyTp1ZW",
+  "admin": true,
+  "__v": 0,
+  "credits": 100,
+  "deaths": 203,
+  "kills": 478
+}]
