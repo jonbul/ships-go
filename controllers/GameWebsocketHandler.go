@@ -281,5 +281,6 @@ func broadCastInterval() {
 		for _, c := range conns {
 			_ = c.WriteJSON(payload)
 		}
+		ActivePlayers.Set(float64(len(players)))
 	}
 }
