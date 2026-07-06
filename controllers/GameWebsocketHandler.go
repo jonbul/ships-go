@@ -254,6 +254,7 @@ func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
 	for range ticker.C {
+		ActivePlayers.Set(float64(len(players)))
 		mu.Lock()
 		if len(playersToSend)+len(newBullets)+len(killsList) == 0 {
 			mu.Unlock()
@@ -281,6 +282,5 @@ func broadCastInterval() {
 		for _, c := range conns {
 			_ = c.WriteJSON(payload)
 		}
-		ActivePlayers.Set(float64(len(players)))
 	}
 }
