@@ -3,7 +3,11 @@ set -x # show commands in execution
 
 CONTAINER_NAME="ships-go"
 IMAGE_NAME="ships-go-image"
-WORK_DIR="/home/jonbul/servers/ships-go"
+ROOT_PATH="/home/jonbul/servers"
+PROJECT_PATH="$ROOT_PATH/ships-go"
+SSL_PATH="$ROOT_PATH/files/ssl"
+ENV_PATH="$ROOT_PATH/files/.env"
+
 
 echo "Usuario actual: $(whoami)"
 
@@ -17,8 +21,8 @@ docker rmi $IMAGE_NAME:latest 2>/dev/null || true
 set -e # exit on error
 
 # Crear directorio de trabajo si no existe
-mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+mkdir -p "$PROJECT_PATH"
+cd "$PROJECT_PATH"
 
 # Descargar el binario compilado por GitHub Actions
 echo "¿Descargar la última release o el último snapshot?"
@@ -62,9 +66,8 @@ docker run -d \
     --network ships-network \
     -p 3000:3000 \
     -p 3001:3001 \
-    -v "$WORK_DIR/.env:/app/.env:ro" \
+    -v "$ENV_PATH:/app/.env:ro" \
+    -v "$SSL_PATH:/ssl:ro" \
     $IMAGE_NAME:latest
 
 docker ps -a
-
-rm Dockerfile.tmp 2>/dev/null || true
