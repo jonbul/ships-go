@@ -22,6 +22,8 @@ Required for 1.0 and deploy
 
 # For the Future
 - Gravitational objects
+- Animated objects
+- Desktop controls udpate
 
 # env
 

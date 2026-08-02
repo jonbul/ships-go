@@ -1,6 +1,6 @@
 CHANGES
 =======
-Version 1.0.0 - 2026-06-XX
+Version 1.0.0 - 2026-08-02
 ------------------
 - Initial release of the Ships game backend API in Go.
 - Migrated from Express.js to Go for improved performance and scalability.
