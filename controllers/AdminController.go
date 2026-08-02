@@ -48,21 +48,9 @@ func getAdminGameData(c *gin.Context) {
 		return
 	}
 
-	var resultCards = make(map[int]map[int]any)
-
-	for x, arrX := range BackgroundCards {
-		resultCards[x] = make(map[int]any)
-		for y := range arrX {
-			resultCards[x][y] = []any{
-				BackgroundCards[x][y][0],
-				BackgroundCards[x][y][1],
-			}
-		}
-	}
-
 	c.IndentedJSON(http.StatusOK, gin.H{
 		"players":     players,
-		"resultCards": resultCards,
+		"resultCards": BackgroundCards,
 	})
 }
 
