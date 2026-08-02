@@ -16,17 +16,19 @@ import (
 	"ships/controllers/models"
 )
 
-type bullet = models.Bullet
+type bulletData = models.BulletData
 type wsEvent = models.WsEvent
+type playerData = models.PlayerData
+type playerHitData = models.PlayerHitData
 
 var mu sync.Mutex
 var userConnections = make(map[string]*websocket.Conn)
 var playerStatus = make(map[string]*websocket.Conn)
-var playersToSend = make(map[string]*wsEvent)
-var players = make(map[string]*wsEvent)
-var newBullets = []bullet{}
+var playersToSend = make(map[string]*playerData)
+var players = make(map[string]*playerData)
+var newBullets = []*bulletData{}
 var bulletsToRemove = []string{}
-var killsList = []*wsEvent{}
+var killsList = []*playerHitData{}
 var hasPlayersTosend = false
 
 // backgroundCards
@@ -60,7 +62,7 @@ func registerWebSocket(router *gin.Engine) {
 		wsHandler(c.Writer, c.Request)
 	})
 	go broadCastInterval()
-	playersToSend = make(map[string]*wsEvent)
+	playersToSend = make(map[string]*playerData)
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -88,18 +90,19 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	// Listen for incoming messages
 	for {
 		// Read message from the client
-		var msg wsEvent
 		_, messagePlain, err := conn.ReadMessage()
-		_ = json.Unmarshal(messagePlain, &msg)
 		if err != nil {
 			break
 		}
 
-		manageInputMessage(conn, &msg, socketId)
+		manageInputMessage(conn, messagePlain, socketId)
 	}
 }
 
-func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
+func manageInputMessage(conn *websocket.Conn, msgPlain []byte, socketId string) {
+	var msg wsEvent
+	_ = json.Unmarshal(msgPlain, &msg)
+
 	switch msg.EventName {
 	case "connectionSuccess":
 		log.Println("New connection with socketId: " + socketId)
@@ -110,11 +113,14 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
 		_ = conn.WriteJSON(msg)
 		return
 	case "playerData":
+
+		var plData *playerData
+		_ = json.Unmarshal(msgPlain, &plData)
 		if "" != socketId && "" != msg.SocketId {
 			msg.SocketId = socketId
 			mu.Lock()
-			playersToSend[socketId] = msg
-			players[socketId] = msg
+			playersToSend[socketId] = plData
+			players[socketId] = plData
 			mu.Unlock()
 		}
 		return
@@ -122,27 +128,37 @@ func manageInputMessage(conn *websocket.Conn, msg *wsEvent, socketId string) {
 		wsGetBackgroundCards(conn)
 		return
 	case "newBullet":
+
+		var bullet *bulletData
+		_ = json.Unmarshal(msgPlain, &bullet)
 		mu.Lock()
-		newBullets = append(newBullets, msg.Bullet)
+		newBullets = append(newBullets, bullet)
 		mu.Unlock()
 		return
 	case "removeBullet":
+
+		var playerHit *playerHitData
+		_ = json.Unmarshal(msgPlain, &playerHit)
 		mu.Lock()
-		bulletsToRemove = append(bulletsToRemove, msg.BulletId)
+		bulletsToRemove = append(bulletsToRemove, playerHit.BulletId)
 		mu.Unlock()
 		return
 	case "playerHit":
+		var playerHit *playerHitData
+		_ = json.Unmarshal(msgPlain, &playerHit)
 		mu.Lock()
-		targetConn := userConnections[msg.PlayerId]
+		targetConn := userConnections[playerHit.PlayerId]
 		mu.Unlock()
 		if targetConn != nil {
-			_ = targetConn.WriteJSON(msg)
+			_ = targetConn.WriteJSON(playerHit)
 		}
 		return
 	case "playerDied":
+		var plHitData *playerHitData
+		_ = json.Unmarshal(msgPlain, &plHitData)
 		mu.Lock()
-		killsList = append(killsList, msg)
-		playerFrom, ok := players[msg.From]
+		killsList = append(killsList, plHitData)
+		playerFrom, ok := players[plHitData.From]
 		if ok {
 			hasPlayersTosend = true
 			playerFrom.Credits += 100
@@ -182,7 +198,6 @@ func buildBackgroundCards() {
 			}
 		}
 	}
-	return
 }
 
 func wsGetBackgroundCards(conn *websocket.Conn) {
@@ -214,9 +229,9 @@ func broadCastInterval() {
 			conns = append(conns, c)
 		}
 		bulletsToRemove = []string{}
-		killsList = []*wsEvent{}
-		newBullets = []bullet{}
-		playersToSend = make(map[string]*wsEvent)
+		killsList = []*playerHitData{}
+		newBullets = []*bulletData{}
+		playersToSend = make(map[string]*playerData)
 		mu.Unlock()
 
 		for _, c := range conns {

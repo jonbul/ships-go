@@ -1,67 +1,46 @@
 package models
 
 type WsEvent struct {
-	EventName string  `json:"eventName" bson:"eventName"`
-	SocketId  string  `json:"socketId" bson:"socketId"`
-	Bullet    Bullet  `json:"bullet" bson:"bullet"`
-	X         float32 `json:"x" bson:"x"` // TODO REMOVE used in newBullet event
-	Y         float32 `json:"y" bson:"y"` // TODO REMOVE used in newBullet event
-
-	// TODO
-	//hitData    playerHitData `json:"playerHitData" bson:"playerHitData"`
-	//playerData playerData    `json:"playerData" bson:"playerData"`
-
-	// TODO move to subclass playerHit
-	BulletId     string  `json:"bulletId" bson:"bulletId"`         // TODO move to subclass playerHit
-	PlayerId     string  `json:"playerId" bson:"playerId"`         // TODO move to subclass playerHit
-	From         string  `json:"from" bson:"from"`                 // TODO move to subclass playerHit
-	BulletCharge float32 `json:"bulletCharge" bson:"bulletCharge"` // TODO move to subclass playerHit
-	// TODO move to subclass playerHit
-
-	// TODO moveToSubClass player
-	// x, y, socketId?, eventName?
-	Credits      int     `json:"credits" bson:"credits"`
-	Rotate       float32 `json:"rotate" bson:"rotate"`
-	Deaths       int     `json:"deaths" bson:"deaths"`
-	ShipId       string  `json:"shipId" bson:"shipId"`
-	IsDead       bool    `json:"isDead" bson:"isDead"`
-	Kills        int     `json:"kills" bson:"kills"`
-	Hide         bool    `json:"hidden" bson:"hidden"`
-	Scale        float32 `json:"scale" bson:"scale"`
-	YTranslation float32 `json:"yTranslation" bson:"yTranslation"`
-	Name         string  `json:"name" bson:"name"`
-	Life         float32 `json:"life" bson:"life"`
-	Xtranslation float32 `json:"xTranslation" bson:"xTranslation"`
-
-	// TODO moveToSubClass player
+	EventName string `json:"eventName" bson:"eventName"`
+	SocketId  string `json:"socketId" bson:"socketId"`
 }
 
-/*
 type PlayerData struct {
-	X            int     `json:"x" bson:"x"`
-	Y            int     `json:"y" bson:"y"`
+	EventName string `json:"eventName" bson:"eventName"`
+	SocketId  string `json:"socketId" bson:"socketId"`
+	//—————————————————————————————————————————————————————————————————————
 	Credits      int     `json:"credits" bson:"credits"`
-	Rotate       float32 `json:"rotate" bson:"rotate"`
 	Deaths       int     `json:"deaths" bson:"deaths"`
-	ShipId       string  `json:"shipId" bson:"shipId"`
+	Hide         bool    `json:"hidden" bson:"hidden"`
 	IsDead       bool    `json:"isDead" bson:"isDead"`
 	Kills        int     `json:"kills" bson:"kills"`
-	Hide         bool    `json:"hidden" bson:"hidden"`
-	Scale        float32 `json:"scale" bson:"scale"`
-	YTranslation float32 `json:"yTranslation" bson:"yTranslation"`
-	Name         string  `json:"name" bson:"name"`
 	Life         float32 `json:"life" bson:"life"`
+	Name         string  `json:"name" bson:"name"`
+	Rotate       float32 `json:"rotate" bson:"rotate"`
+	Scale        float32 `json:"scale" bson:"scale"`
+	ShipId       string  `json:"shipId" bson:"shipId"`
+	X            float32 `json:"x" bson:"x"`
 	Xtranslation float32 `json:"xTranslation" bson:"xTranslation"`
+	Y            float32 `json:"y" bson:"y"`
+	YTranslation float32 `json:"yTranslation" bson:"yTranslation"`
 }
 
-type playerHitData struct {
-	BulletId     string  `json:"bulletId" bson:"bulletId"`
-	PlayerId     string  `json:"playerId" bson:"playerId"`
-	From         string  `json:"from" bson:"from"`
+type PlayerHitData struct {
+	EventName string `json:"eventName" bson:"eventName"`
+	SocketId  string `json:"socketId" bson:"socketId"`
+	//—————————————————————————————————————————————————————————————————————
 	BulletCharge float32 `json:"bulletCharge" bson:"bulletCharge"`
-}*/
+	BulletId     string  `json:"bulletId" bson:"bulletId"`
+	From         string  `json:"from" bson:"from"`
+	PlayerId     string  `json:"playerId" bson:"playerId"`
+	X            float32 `json:"x" bson:"x"`
+	Y            float32 `json:"y" bson:"y"`
+}
 
-type Bullet struct {
+type BulletData struct {
+	EventName string `json:"eventName" bson:"eventName"`
+	SocketId  string `json:"socketId" bson:"socketId"`
+	//—————————————————————————————————————————————————————————————————————
 	Angle         float32 `json:"angle" bson:"angle"`
 	BulletCharge  float32 `json:"bulletCharge" bson:"bulletCharge"`
 	ExpY          float32 `json:"expY" bson:"expY"`
