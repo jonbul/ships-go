@@ -1,5 +1,8 @@
 CHANGES
 =======
+Version 1.0.1 - 2026-08-04
+------------------
+- Disconnected users aren't removed propperly
 Version 1.0.0 - 2026-08-02
 ------------------
 - Initial release of the Ships game backend API in Go.
@@ -19,5 +22,5 @@ Version 1.0.0 - 2026-08-02
       - [X] Check animation works in all users at same time.
     - [X] Monitoring.
   - BUGS:
-    - [ ] Disconnected users aren't removed propperly
+    - [X] Disconnected users aren't removed propperly
     
