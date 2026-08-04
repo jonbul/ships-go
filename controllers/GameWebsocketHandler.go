@@ -205,15 +205,27 @@ func wsGetBackgroundCards(conn *websocket.Conn) {
 	_ = conn.WriteJSON(gin.H{"eventName": "getBackgroundCards", "cards": BackgroundCards})
 }
 
+var lastBroadcastTime int64 = 0
+
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
 	for range ticker.C {
 		ActivePlayers.Set(float64(len(players)))
 		mu.Lock()
-		if len(playersToSend)+len(newBullets)+len(killsList) == 0 {
+
+		var currentTime = time.Now().UnixMilli()
+
+		// send at least every 2 seconds or if there are any new bullets, players, or kills to send
+		if len(players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList) == 0 && currentTime-lastBroadcastTime < 2000) {
 			mu.Unlock()
 			continue
+		}
+		lastBroadcastTime = currentTime
+
+		var playerIds = make([]string, 0, len(players))
+		for id := range players {
+			playerIds = append(playerIds, id)
 		}
 
 		var payload = map[string]any{
@@ -222,6 +234,7 @@ func broadCastInterval() {
 			"newBullets":      newBullets,
 			"players":         playersToSend,
 			"kills":           killsList,
+			"activePlayerIds": playerIds,
 		}
 
 		conns := make([]*websocket.Conn, 0, len(userConnections))
