@@ -176,7 +176,7 @@ func buildBackgroundCards() {
 		return
 	}
 	var w = resolutions[currentResolution].Width
-	var h = resolutions[currentResolution].Height
+	var h = resolutions[currentResolution].Width
 
 	for x := 0; x < 5; x++ {
 		BackgroundCards[x] = make(map[int]Card)
@@ -206,6 +206,8 @@ func wsGetBackgroundCards(conn *websocket.Conn) {
 }
 
 var lastBroadcastTime int64 = 0
+var lastBlackHole int64 = 0
+var newBlackHoleInterval int64 = 30000 // 30 seconds
 
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
@@ -237,6 +239,11 @@ func broadCastInterval() {
 			"activePlayerIds": playerIds,
 		}
 
+		if len(players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval {
+			payload["blackHole"] = createNewBlackHole()
+			lastBlackHole = currentTime
+		}
+
 		conns := make([]*websocket.Conn, 0, len(userConnections))
 		for _, c := range userConnections {
 			conns = append(conns, c)
@@ -251,4 +258,35 @@ func broadCastInterval() {
 			_ = c.WriteJSON(payload)
 		}
 	}
+}
+
+func createNewBlackHole() map[string]any {
+	var minX, minY, maxX, maxY float32
+	first := true
+	for id := range players {
+		if first {
+			minX = players[id].X
+			minY = players[id].Y
+			maxX = players[id].X
+			maxY = players[id].Y
+			first = false
+			continue
+		}
+
+		minX = min(minX, players[id].X)
+		minY = min(minY, players[id].Y)
+		maxX = max(maxX, players[id].X)
+		maxY = max(maxY, players[id].Y)
+	}
+
+	var blackHole = map[string]any{}
+	var rangeX = maxX - minX
+	var rangeY = maxY - minY
+
+	blackHole["x"] = rand.Float64()*float64(rangeX) + float64(minX)
+	blackHole["y"] = rand.Float64()*float64(rangeY) + float64(minY)
+	blackHole["maxSize"] = 800
+	blackHole["direction"] = rand.IntN(360)
+	blackHole["duration"] = 25
+	return blackHole
 }
