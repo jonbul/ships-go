@@ -21,9 +21,19 @@ type wsEvent = models.WsEvent
 type playerData = models.PlayerData
 type playerHitData = models.PlayerHitData
 
+type safeConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func (sc *safeConn) writeJSON(v any) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.conn.WriteJSON(v)
+}
+
 var mu sync.Mutex
-var userConnections = make(map[string]*websocket.Conn)
-var playerStatus = make(map[string]*websocket.Conn)
+var userConnections = make(map[string]*safeConn)
 var playersToSend = make(map[string]*playerData)
 var players = make(map[string]*playerData)
 var newBullets = []*bulletData{}
@@ -84,8 +94,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		delete(players, socketId)
 		mu.Unlock()
 	}(conn, socketId)
+	sc := &safeConn{conn: conn}
 	mu.Lock()
-	userConnections[socketId] = conn
+	userConnections[socketId] = sc
 	mu.Unlock()
 	// Listen for incoming messages
 	for {
@@ -95,22 +106,19 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		manageInputMessage(conn, messagePlain, socketId)
+		manageInputMessage(sc, messagePlain, socketId)
 	}
 }
 
-func manageInputMessage(conn *websocket.Conn, msgPlain []byte, socketId string) {
+func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 	var msg wsEvent
 	_ = json.Unmarshal(msgPlain, &msg)
 
 	switch msg.EventName {
 	case "connectionSuccess":
 		log.Println("New connection with socketId: " + socketId)
-		mu.Lock()
-		userConnections[socketId] = conn
-		mu.Unlock()
 		msg.SocketId = socketId
-		_ = conn.WriteJSON(msg)
+		_ = conn.writeJSON(msg)
 		return
 	case "playerData":
 
@@ -150,7 +158,7 @@ func manageInputMessage(conn *websocket.Conn, msgPlain []byte, socketId string) 
 		targetConn := userConnections[playerHit.PlayerId]
 		mu.Unlock()
 		if targetConn != nil {
-			_ = targetConn.WriteJSON(playerHit)
+			_ = targetConn.writeJSON(playerHit)
 		}
 		return
 	case "playerDied":
@@ -200,9 +208,9 @@ func buildBackgroundCards() {
 	}
 }
 
-func wsGetBackgroundCards(conn *websocket.Conn) {
+func wsGetBackgroundCards(conn *safeConn) {
 	buildBackgroundCards()
-	_ = conn.WriteJSON(gin.H{"eventName": "getBackgroundCards", "cards": BackgroundCards})
+	_ = conn.writeJSON(gin.H{"eventName": "getBackgroundCards", "cards": BackgroundCards})
 }
 
 var lastBroadcastTime int64 = 0
@@ -237,7 +245,7 @@ func broadCastInterval() {
 			"activePlayerIds": playerIds,
 		}
 
-		conns := make([]*websocket.Conn, 0, len(userConnections))
+		conns := make([]*safeConn, 0, len(userConnections))
 		for _, c := range userConnections {
 			conns = append(conns, c)
 		}
@@ -248,7 +256,7 @@ func broadCastInterval() {
 		mu.Unlock()
 
 		for _, c := range conns {
-			_ = c.WriteJSON(payload)
+			_ = c.writeJSON(payload)
 		}
 	}
 }
