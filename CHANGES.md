@@ -1,8 +1,13 @@
 CHANGES
 =======
+Version 1.0.2 - 2026-08-06
+------------------
+- Concurrent users bug
+
 Version 1.0.1 - 2026-08-04
 ------------------
 - Disconnected users aren't removed propperly
+
 Version 1.0.0 - 2026-08-02
 ------------------
 - Initial release of the Ships game backend API in Go.
