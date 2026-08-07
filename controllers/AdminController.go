@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+
+	"ships/controllers/websocket"
 )
 
 func registerAdminRoutes(router *gin.Engine) {
@@ -49,8 +51,8 @@ func getAdminGameData(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{
-		"players":     players,
-		"resultCards": BackgroundCards,
+		"players":     websocket.Players,
+		"resultCards": websocket.BackgroundCards,
 	})
 }
 

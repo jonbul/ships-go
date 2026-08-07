@@ -1,4 +1,4 @@
-package controllers
+package websocket
 
 import (
 	"encoding/json"
@@ -12,8 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus"
 
-	"ships/controllers/models"
+	"ships/controllers/websocket/models"
 )
 
 type bulletData = models.BulletData
@@ -35,11 +36,19 @@ func (sc *safeConn) writeJSON(v any) error {
 var mu sync.Mutex
 var userConnections = make(map[string]*safeConn)
 var playersToSend = make(map[string]*playerData)
-var players = make(map[string]*playerData)
+var Players = make(map[string]*playerData)
 var newBullets = []*bulletData{}
 var bulletsToRemove = []string{}
 var killsList = []*playerHitData{}
 var hasPlayersTosend = false
+
+var cardSizeX = 3840
+var cardSizeY = 3840
+
+var ActivePlayers = prometheus.NewGauge(prometheus.GaugeOpts{
+	Name: "ships_active_players",
+	Help: "Current number of in-game players.",
+})
 
 // backgroundCards
 // {x: {y : [xInCard, yInCard,size(1 to 5)]}}
@@ -67,7 +76,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func registerWebSocket(router *gin.Engine) {
+func RegisterWebSocket(router *gin.Engine) {
 	router.GET("/ws", func(c *gin.Context) {
 		wsHandler(c.Writer, c.Request)
 	})
@@ -91,7 +100,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		mu.Lock() // to ensure thread safety when modifying the maps
 		delete(userConnections, socketId)
-		delete(players, socketId)
+		delete(Players, socketId)
 		mu.Unlock()
 	}(conn, socketId)
 	sc := &safeConn{conn: conn}
@@ -128,7 +137,7 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 			msg.SocketId = socketId
 			mu.Lock()
 			playersToSend[socketId] = plData
-			players[socketId] = plData
+			Players[socketId] = plData
 			mu.Unlock()
 		}
 		return
@@ -166,7 +175,7 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 		_ = json.Unmarshal(msgPlain, &plHitData)
 		mu.Lock()
 		killsList = append(killsList, plHitData)
-		playerFrom, ok := players[plHitData.From]
+		playerFrom, ok := Players[plHitData.From]
 		if ok {
 			hasPlayersTosend = true
 			playerFrom.Credits += 100
@@ -183,8 +192,8 @@ func buildBackgroundCards() {
 	if len(BackgroundCards) > 0 {
 		return
 	}
-	var w = resolutions[currentResolution].Width
-	var h = resolutions[currentResolution].Width
+	var w = cardSizeX
+	var h = cardSizeY
 
 	for x := 0; x < 5; x++ {
 		BackgroundCards[x] = make(map[int]Card)
@@ -210,7 +219,7 @@ func buildBackgroundCards() {
 
 func wsGetBackgroundCards(conn *safeConn) {
 	buildBackgroundCards()
-	_ = conn.writeJSON(gin.H{"eventName": "getBackgroundCards", "cards": BackgroundCards})
+	_ = conn.writeJSON(gin.H{"eventName": "getBackgroundCards", "cards": BackgroundCards, "cardSize": gin.H{"x": cardSizeX, "y": cardSizeY}})
 }
 
 var lastBroadcastTime int64 = 0
@@ -221,70 +230,73 @@ func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
 	defer ticker.Stop()
 	for range ticker.C {
-		ActivePlayers.Set(float64(len(players)))
-		mu.Lock()
+		broadCastIntervalLoop()
+	}
+}
 
-		var currentTime = time.Now().UnixMilli()
+func broadCastIntervalLoop() {
+	ActivePlayers.Set(float64(len(Players)))
+	mu.Lock()
+	defer mu.Unlock()
 
-		// send at least every 2 seconds or if there are any new bullets, players, or kills to send
-		if len(players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList) == 0 && currentTime-lastBroadcastTime < 2000) {
-			mu.Unlock()
-			continue
-		}
-		lastBroadcastTime = currentTime
+	var currentTime = time.Now().UnixMilli()
 
-		var playerIds = make([]string, 0, len(players))
-		for id := range players {
-			playerIds = append(playerIds, id)
-		}
+	// send at least every 2 seconds or if there are any new bullets, players, or kills to send
+	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList) == 0 && currentTime-lastBroadcastTime < 2000) {
+		return
+	}
+	lastBroadcastTime = currentTime
 
-		var payload = map[string]any{
-			"eventName":       "gameBroadcast",
-			"bulletsToRemove": bulletsToRemove,
-			"newBullets":      newBullets,
-			"players":         playersToSend,
-			"kills":           killsList,
-			"activePlayerIds": playerIds,
-		}
+	var playerIds = make([]string, 0, len(Players))
+	for id := range Players {
+		playerIds = append(playerIds, id)
+	}
 
-		if len(players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval {
-			payload["blackHole"] = createNewBlackHole()
-			lastBlackHole = currentTime
-		}
+	var payload = map[string]any{
+		"eventName":       "gameBroadcast",
+		"bulletsToRemove": bulletsToRemove,
+		"newBullets":      newBullets,
+		"players":         playersToSend,
+		"kills":           killsList,
+		"activePlayerIds": playerIds,
+	}
 
-		conns := make([]*safeConn, 0, len(userConnections))
-		for _, c := range userConnections {
-			conns = append(conns, c)
-		}
-		bulletsToRemove = []string{}
-		killsList = []*playerHitData{}
-		newBullets = []*bulletData{}
-		playersToSend = make(map[string]*playerData)
-		mu.Unlock()
+	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval {
+		payload["blackHole"] = createNewBlackHole()
+		lastBlackHole = currentTime
+	}
 
-		for _, c := range conns {
-			_ = c.writeJSON(payload)
-		}
+	conns := make([]*safeConn, 0, len(userConnections))
+	for _, c := range userConnections {
+		conns = append(conns, c)
+	}
+	bulletsToRemove = []string{}
+	killsList = []*playerHitData{}
+	newBullets = []*bulletData{}
+	playersToSend = make(map[string]*playerData)
+
+	for _, c := range conns {
+		_ = c.writeJSON(payload)
 	}
 }
 
 func createNewBlackHole() map[string]any {
 	var minX, minY, maxX, maxY float32
 	first := true
-	for id := range players {
+	for id := range Players {
 		if first {
-			minX = players[id].X
-			minY = players[id].Y
-			maxX = players[id].X
-			maxY = players[id].Y
+			minX = Players[id].X
+			minY = Players[id].Y
+			maxX = Players[id].X
+			maxY = Players[id].Y
 			first = false
 			continue
 		}
 
-		minX = min(minX, players[id].X)
-		minY = min(minY, players[id].Y)
-		maxX = max(maxX, players[id].X)
-		maxY = max(maxY, players[id].Y)
+		minX = min(minX, Players[id].X)
+		minY = min(minY, Players[id].Y)
+		maxX = max(maxX, Players[id].X)
+		maxY = max(maxY, Players[id].Y)
 	}
 
 	var blackHole = map[string]any{}

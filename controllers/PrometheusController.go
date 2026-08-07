@@ -6,21 +6,18 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"ships/controllers/websocket"
 )
 
-var (
-	ActivePlayers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "ships_active_players",
-		Help: "Current number of in-game players.",
-	})
-)
+var activePlayers = websocket.ActivePlayers
 
 func RegisterPrometheusRoutes(router *gin.Engine) {
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		ActivePlayers,
+		activePlayers,
 	)
 
 	router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))

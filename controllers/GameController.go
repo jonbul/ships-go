@@ -2,9 +2,11 @@ package controllers
 
 import (
 	"net/http"
-	"ships/models"
 
 	"github.com/gin-gonic/gin"
+
+	"ships/controllers/websocket"
+	"ships/models"
 )
 
 func registerGameRoutes(router *gin.Engine) {
@@ -77,5 +79,5 @@ func getShips(c *gin.Context) {
 }
 
 func getPlayers(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, players)
+	c.IndentedJSON(http.StatusOK, websocket.Players)
 }
