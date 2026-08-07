@@ -53,3 +53,15 @@ type BulletData struct {
 	X             float32 `json:"x" bson:"x"`
 	Y             float32 `json:"y" bson:"y"`
 }
+
+type BlackHoleData struct {
+	Type      string  `json:"type" bson:"type"`
+	X         float64 `json:"x" bson:"x"`
+	Y         float64 `json:"y" bson:"y"`
+	Scale     float64 `json:"scale" bson:"scale"`
+	MaxSize   int     `json:"maxSize" bson:"maxSize"`
+	Direction float64 `json:"direction" bson:"direction"`
+	Duration  int     `json:"duration" bson:"duration"`
+	Id        int64   `json:"id" bson:"id"`
+	Speed     float64 `json:"speed" bson:"speed"`
+}

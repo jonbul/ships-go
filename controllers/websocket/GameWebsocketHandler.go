@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"sync"
@@ -41,6 +42,7 @@ var newBullets = []*bulletData{}
 var bulletsToRemove = []string{}
 var killsList = []*playerHitData{}
 var hasPlayersTosend = false
+var blackHoles = make(map[int64]models.BlackHoleData)
 
 var cardSizeX = 3840
 var cardSizeY = 3840
@@ -242,7 +244,7 @@ func broadCastIntervalLoop() {
 	var currentTime = time.Now().UnixMilli()
 
 	// send at least every 2 seconds or if there are any new bullets, players, or kills to send
-	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList) == 0 && currentTime-lastBroadcastTime < 2000) {
+	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList)+len(blackHoles) == 0 && currentTime-lastBroadcastTime < 2000) {
 		return
 	}
 	lastBroadcastTime = currentTime
@@ -252,6 +254,8 @@ func broadCastIntervalLoop() {
 		playerIds = append(playerIds, id)
 	}
 
+	moveNPCs()
+
 	var payload = map[string]any{
 		"eventName":       "gameBroadcast",
 		"bulletsToRemove": bulletsToRemove,
@@ -259,10 +263,12 @@ func broadCastIntervalLoop() {
 		"players":         playersToSend,
 		"kills":           killsList,
 		"activePlayerIds": playerIds,
+		"blackHoles":      blackHoles,
 	}
 
 	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval {
-		payload["blackHole"] = createNewBlackHole()
+		var blackHole = createNewBlackHole()
+		blackHoles[blackHole.Id] = blackHole
 		lastBlackHole = currentTime
 	}
 
@@ -280,7 +286,7 @@ func broadCastIntervalLoop() {
 	}
 }
 
-func createNewBlackHole() map[string]any {
+func createNewBlackHole() models.BlackHoleData {
 	var minX, minY, maxX, maxY float32
 	first := true
 	for id := range Players {
@@ -299,14 +305,50 @@ func createNewBlackHole() map[string]any {
 		maxY = max(maxY, Players[id].Y)
 	}
 
-	var blackHole = map[string]any{}
 	var rangeX = maxX - minX
 	var rangeY = maxY - minY
 
-	blackHole["x"] = rand.Float64()*float64(rangeX) + float64(minX)
-	blackHole["y"] = rand.Float64()*float64(rangeY) + float64(minY)
-	blackHole["maxSize"] = 800
-	blackHole["direction"] = rand.IntN(360)
-	blackHole["duration"] = 25
+	var blackHole = models.BlackHoleData{
+		Type:      "BlackHole",
+		X:         rand.Float64()*float64(rangeX) + float64(minX),
+		Y:         rand.Float64()*float64(rangeY) + float64(minY),
+		MaxSize:   800,
+		Direction: rand.Float64() * 360,
+		Duration:  25000,
+		Id:        time.Now().UnixMilli(),
+		Speed:     5.0,
+	}
+
 	return blackHole
+}
+func moveNPCs() {
+	blackHoleIdsToRemove := []int64{}
+	for id, blackHole := range blackHoles {
+		var currentDuration = time.Now().UnixMilli() - id
+		var maxDuration = int64(blackHole.Duration)
+		var inTime = currentDuration < maxDuration
+		var scaleInc = float64(0.01)
+
+		if inTime && blackHole.Scale < 1.0 {
+			blackHole.Scale += scaleInc
+		} else if !inTime && blackHole.Scale <= 0 {
+			blackHoleIdsToRemove = append(blackHoleIdsToRemove, id)
+			continue
+		} else if !inTime && blackHole.Scale > 0 {
+			blackHole.Scale -= scaleInc
+		}
+
+		// Move the black hole in the direction it's facing
+		radians := blackHole.Direction * (3.141592653589793 / 180) // Convert degrees to radians
+		speed := blackHole.Speed                                   // Adjust this value for desired speed
+		blackHole.X += speed * float64(math.Cos(radians))
+		blackHole.Y += speed * float64(math.Sin(radians))
+
+		// Update the black hole in the map
+		blackHoles[id] = blackHole
+	}
+
+	for _, id := range blackHoleIdsToRemove {
+		delete(blackHoles, id)
+	}
 }
