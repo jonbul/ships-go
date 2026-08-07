@@ -312,6 +312,7 @@ func createNewBlackHole() models.BlackHoleData {
 		Type:      "BlackHole",
 		X:         rand.Float64()*float64(rangeX) + float64(minX),
 		Y:         rand.Float64()*float64(rangeY) + float64(minY),
+		Scale:     0.01,
 		MaxSize:   800,
 		Direction: rand.Float64() * 360,
 		Duration:  25000,
@@ -331,10 +332,10 @@ func moveNPCs() {
 
 		if inTime && blackHole.Scale < 1.0 {
 			blackHole.Scale += scaleInc
-		} else if !inTime && blackHole.Scale <= 0 {
+		} else if !inTime && blackHole.Scale <= 0.01 {
 			blackHoleIdsToRemove = append(blackHoleIdsToRemove, id)
 			continue
-		} else if !inTime && blackHole.Scale > 0 {
+		} else if !inTime && blackHole.Scale > 0.01 {
 			blackHole.Scale -= scaleInc
 		}
 
