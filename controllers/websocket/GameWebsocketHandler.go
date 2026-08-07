@@ -122,71 +122,80 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
-	var msg wsEvent
-	_ = json.Unmarshal(msgPlain, &msg)
-
-	switch msg.EventName {
-	case "connectionSuccess":
-		log.Println("New connection with socketId: " + socketId)
-		msg.SocketId = socketId
-		_ = conn.writeJSON(msg)
+	var rawMsgs []json.RawMessage
+	if err := json.Unmarshal(msgPlain, &rawMsgs); err != nil {
+		log.Println("invalid ws payload:", err)
 		return
-	case "playerData":
+	}
 
-		var plData *playerData
-		_ = json.Unmarshal(msgPlain, &plData)
-		if "" != socketId && "" != msg.SocketId {
+	for _, raw := range rawMsgs {
+		var meta struct {
+			EventName string `json:"eventName"`
+			SocketId  string `json:"socketId"`
+		}
+		if err := json.Unmarshal(raw, &meta); err != nil {
+			log.Println("invalid ws item:", err)
+			continue
+		}
+		var msg wsEvent
+		_ = json.Unmarshal(raw, &msg)
+		switch msg.EventName {
+		case "connectionSuccess":
+			log.Println("New connection with socketId: " + socketId)
 			msg.SocketId = socketId
+			_ = conn.writeJSON(msg)
+		case "playerData":
+
+			var plData *playerData
+			_ = json.Unmarshal(raw, &plData)
+			if "" != socketId && "" != msg.SocketId && "" != plData.SocketId {
+				msg.SocketId = socketId
+				mu.Lock()
+				playersToSend[socketId] = plData
+				Players[socketId] = plData
+				mu.Unlock()
+			}
+		case "getBackgroundCards":
+			wsGetBackgroundCards(conn)
+		case "newBullet":
+
+			var bullet *bulletData
+			_ = json.Unmarshal(raw, &bullet)
 			mu.Lock()
-			playersToSend[socketId] = plData
-			Players[socketId] = plData
+			newBullets = append(newBullets, bullet)
 			mu.Unlock()
-		}
-		return
-	case "getBackgroundCards":
-		wsGetBackgroundCards(conn)
-		return
-	case "newBullet":
+		case "removeBullet":
 
-		var bullet *bulletData
-		_ = json.Unmarshal(msgPlain, &bullet)
-		mu.Lock()
-		newBullets = append(newBullets, bullet)
-		mu.Unlock()
-		return
-	case "removeBullet":
-
-		var playerHit *playerHitData
-		_ = json.Unmarshal(msgPlain, &playerHit)
-		mu.Lock()
-		bulletsToRemove = append(bulletsToRemove, playerHit.BulletId)
-		mu.Unlock()
-		return
-	case "playerHit":
-		var playerHit *playerHitData
-		_ = json.Unmarshal(msgPlain, &playerHit)
-		mu.Lock()
-		targetConn := userConnections[playerHit.PlayerId]
-		mu.Unlock()
-		if targetConn != nil {
-			_ = targetConn.writeJSON(playerHit)
+			var playerHit *playerHitData
+			_ = json.Unmarshal(raw, &playerHit)
+			mu.Lock()
+			bulletsToRemove = append(bulletsToRemove, playerHit.BulletId)
+			mu.Unlock()
+		case "playerHit":
+			var playerHit *playerHitData
+			_ = json.Unmarshal(raw, &playerHit)
+			mu.Lock()
+			targetConn := userConnections[playerHit.PlayerId]
+			mu.Unlock()
+			if targetConn != nil {
+				_ = targetConn.writeJSON(playerHit)
+			}
+		case "playerDied":
+			var plHitData *playerHitData
+			_ = json.Unmarshal(raw, &plHitData)
+			mu.Lock()
+			killsList = append(killsList, plHitData)
+			playerFrom, ok := Players[plHitData.From]
+			if ok {
+				hasPlayersTosend = true
+				playerFrom.Credits += 100
+			}
+			mu.Unlock()
+		default:
+			log.Println("--------------------------")
+			log.Println("Unknown event: " + msg.EventName)
+			log.Println("--------------------------")
 		}
-		return
-	case "playerDied":
-		var plHitData *playerHitData
-		_ = json.Unmarshal(msgPlain, &plHitData)
-		mu.Lock()
-		killsList = append(killsList, plHitData)
-		playerFrom, ok := Players[plHitData.From]
-		if ok {
-			hasPlayersTosend = true
-			playerFrom.Credits += 100
-		}
-		mu.Unlock()
-	default:
-		log.Println("--------------------------")
-		log.Println("Unknown event: " + msg.EventName)
-		log.Println("--------------------------")
 	}
 }
 
