@@ -318,7 +318,7 @@ func createNewBlackHole() models.BlackHoleData {
 	var rangeY = maxY - minY
 
 	var blackHole = models.BlackHoleData{
-		Type:      "BlackHole",
+		Type:      models.NpcTypes.BlackHole,
 		X:         rand.Float64()*float64(rangeX) + float64(minX),
 		Y:         rand.Float64()*float64(rangeY) + float64(minY),
 		Scale:     0.01,

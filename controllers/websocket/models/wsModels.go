@@ -65,3 +65,13 @@ type BlackHoleData struct {
 	Id        int64   `json:"id" bson:"id"`
 	Speed     float64 `json:"speed" bson:"speed"`
 }
+
+// private struct to hold NPC types
+type npcTypes struct {
+	BlackHole string `json:"blackHole" bson:"blackHole"`
+}
+
+// public instance to use as enum
+var NpcTypes npcTypes = npcTypes{
+	BlackHole: "BlackHole",
+}
