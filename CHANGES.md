@@ -1,5 +1,9 @@
 CHANGES
 =======
+Version 1.0.3 - 2026-08-09
+------------------
+- Missing borderWidth in shape Struct
+
 Version 1.0.2 - 2026-08-06
 ------------------
 - Concurrent users bug
