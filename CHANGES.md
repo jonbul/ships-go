@@ -1,5 +1,7 @@
 CHANGES
 =======
+- Version metadata.properties ---
+
 Version 1.0.3 - 2026-08-09
 ------------------
 - Missing borderWidth in shape Struct
