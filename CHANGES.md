@@ -1,8 +1,14 @@
 CHANGES
 =======
+Version metadata.properties
+
 Version 1.1.0 - 2026-08-XX
 ------------------
 - New black hole managed from backend
+
+Version 1.0.3 - 2026-08-09
+------------------
+- Missing borderWidth in shape Struct
 
 Version 1.0.2 - 2026-08-06
 ------------------
