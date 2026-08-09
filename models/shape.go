@@ -17,6 +17,7 @@ type Shape struct {
 	EndAngle        float32 `json:"endAngle" bson:"endAngle"`
 	BackgroundColor string  `json:"backgroundColor" bson:"backgroundColor"`
 	BorderColor     string  `json:"borderColor" bson:"borderColor"`
+	BorderWidth     float32 `json:"borderWidth" bson:"borderWidth"`
 	Rotation        float32 `json:"rotation" bson:"rotation"`
 	Src             string  `json:"src" bson:"src"`
 	Name            string  `json:"name" bson:"name"`
