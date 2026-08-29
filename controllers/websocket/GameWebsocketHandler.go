@@ -275,7 +275,7 @@ func broadCastIntervalLoop() {
 		"blackHoles":      blackHoles,
 	}
 
-	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval {
+	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval && len(blackHoles) < 10 {
 		var blackHole = createNewBlackHole()
 		blackHoles[blackHole.Id] = blackHole
 		lastBlackHole = currentTime
@@ -314,6 +314,11 @@ func createNewBlackHole() models.BlackHoleData {
 		maxY = max(maxY, Players[id].Y)
 	}
 
+	minX -= 2000
+	maxX += 2000
+	minY -= 2000
+	maxY += 2000
+
 	var rangeX = maxX - minX
 	var rangeY = maxY - minY
 
@@ -324,9 +329,9 @@ func createNewBlackHole() models.BlackHoleData {
 		Scale:     0.01,
 		MaxSize:   800,
 		Direction: rand.Float64() * 360,
-		Duration:  25000,
+		Duration:  180000,
 		Id:        time.Now().UnixMilli(),
-		Speed:     5.0,
+		Speed:     7.5,
 	}
 
 	return blackHole
