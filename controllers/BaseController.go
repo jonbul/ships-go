@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"ships/controllers/websocket"
 )
 
 const SessionDuration = 2592000000
@@ -21,7 +23,7 @@ func RegisterRoutes(router *gin.Engine) {
 	registerUserRoutes(router)
 	registerPaintingBoardRoutes(router)
 	registerGameRoutes(router)
-	registerWebSocket(router)
+	websocket.RegisterWebSocket(router)
 	registerAdminRoutes(router)
 	//RegisterPrometheusRoutes(router)
 }
