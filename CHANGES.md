@@ -2,7 +2,7 @@ CHANGES
 =======
 Version metadata.properties
 
-Version 1.1.0 - 2026-08-XX
+Version 1.1.0 - 2026-09-04
 ------------------
 - New black hole managed from backend
 
