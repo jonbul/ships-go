@@ -1,5 +1,37 @@
 CHANGES
 =======
+Version 1.4.1 - 2026-09-05
+------------------
+- NPC enemy ship speed is now carried as a game-unit speed
+  (`enemyShipSpeed`, same scale as ships-vue's `SPEED.MAX` of 50) rather
+  than a 0-1 fraction, and the built-in defaults were updated to match
+  ships-npc: 1 ship, 10 life, speed 20, 500 ms fire rate, 2 black holes,
+  30 s spawn period.
+
+Version 1.4.0 - 2026-09-05
+------------------
+- New `npcConfig` websocket event and NPC settings storage, so an
+  administrator can tune the NPCs from ships-vue's admin panel while the
+  game is running. The settings are exposed through the existing
+  `GET /game/admin/data` and `POST /game/admin` endpoints and pushed to
+  the authenticated `ships-npc` controller connection immediately on save,
+  and again right after it authenticates - so whichever process restarted
+  last converges on the same values, with no polling and no second
+  endpoint. The browser never talks to `ships-npc` directly.
+- Values are clamped server-side (`NpcSettingsData.Sanitized`) and echoed
+  back in the save response, so the admin panel shows what is genuinely in
+  force rather than a number that was silently rejected downstream.
+  `ships-npc` clamps again on receipt, since it can't trust the wire.
+
+Version 1.3.0 - 2026-09-05
+------------------
+- New `npcHit` websocket event: forwards a player's report of a bullet
+  hitting an NPC straight to the `ships-npc` controller connection (no
+  validation/damage logic here, NPC keeps owning its own health/state).
+- Supports destructible NPCs (used by `ships-npc`'s new enemy Ship NPC)
+  by reusing the existing `playerDied`/`newBullet`/`removeBullet`/
+  `playerHit` events untouched - no other backend changes were required.
+
 Version 1.2.0 - 2026-09-XX
 ------------------
 - NPC simulation (black holes) moved out to the new `ships-npc` service.

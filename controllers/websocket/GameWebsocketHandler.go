@@ -25,6 +25,7 @@ type wsEvent = models.WsEvent
 type playerData = models.PlayerData
 type playerHitData = models.PlayerHitData
 type npcData = models.NpcData
+type npcHitData = models.NpcHitData
 
 type safeConn struct {
 	conn       *websocket.Conn
@@ -208,6 +209,10 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 				conn.isNpc = true
 				conn.mu.Unlock()
 				log.Println("NPC controller authenticated from " + conn.remoteAddr)
+				// Tell it the settings in force right away, so a restart
+				// of either process converges without an admin having to
+				// re-save the panel.
+				sendNpcSettings(conn)
 			} else {
 				log.Println("Rejected npcAuth attempt from " + conn.remoteAddr)
 			}
@@ -222,6 +227,21 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 			npcs = make(map[string]npcData, len(update.Npcs))
 			for _, npc := range update.Npcs {
 				npcs[npc.Id] = npc
+			}
+			mu.Unlock()
+		case "npcHit":
+			// A player's client detected that its own bullet hit a Ship NPC
+			// (see checkBulletCollision in ships-vue). ships-go doesn't
+			// track NPC health itself, so just forward this to whichever
+			// connection(s) are the authenticated NPC controller
+			// (ships-npc), which owns that state.
+			var hit npcHitData
+			_ = json.Unmarshal(raw, &hit)
+			mu.Lock()
+			for _, c := range userConnections {
+				if c.isNpc {
+					_ = c.writeJSON(hit)
+				}
 			}
 			mu.Unlock()
 		default:
