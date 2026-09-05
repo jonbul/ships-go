@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"math/rand/v2"
+	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,10 +24,13 @@ type bulletData = models.BulletData
 type wsEvent = models.WsEvent
 type playerData = models.PlayerData
 type playerHitData = models.PlayerHitData
+type npcData = models.NpcData
 
 type safeConn struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn       *websocket.Conn
+	mu         sync.Mutex
+	remoteAddr string
+	isNpc      bool
 }
 
 func (sc *safeConn) writeJSON(v any) error {
@@ -42,7 +47,11 @@ var newBullets = []*bulletData{}
 var bulletsToRemove = []string{}
 var killsList = []*playerHitData{}
 var hasPlayersTosend = false
-var blackHoles = make(map[int64]models.BlackHoleData)
+
+// npcs holds the latest full snapshot of every NPC (black holes and future
+// NPC kinds), as pushed by the ships-npc service. ships-go doesn't simulate
+// NPCs itself anymore: it just relays this snapshot to players.
+var npcs = make(map[string]npcData)
 
 var cardSizeX = 3840
 var cardSizeY = 3840
@@ -105,7 +114,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		delete(Players, socketId)
 		mu.Unlock()
 	}(conn, socketId)
-	sc := &safeConn{conn: conn}
+	sc := &safeConn{conn: conn, remoteAddr: r.RemoteAddr}
 	mu.Lock()
 	userConnections[socketId] = sc
 	mu.Unlock()
@@ -191,6 +200,30 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 				playerFrom.Credits += 100
 			}
 			mu.Unlock()
+		case "npcAuth":
+			var auth models.NpcAuthData
+			_ = json.Unmarshal(raw, &auth)
+			if isNpcAuthValid(conn, auth.Secret) {
+				conn.mu.Lock()
+				conn.isNpc = true
+				conn.mu.Unlock()
+				log.Println("NPC controller authenticated from " + conn.remoteAddr)
+			} else {
+				log.Println("Rejected npcAuth attempt from " + conn.remoteAddr)
+			}
+		case "npcUpdate":
+			if !conn.isNpc {
+				log.Println("Ignoring npcUpdate from unauthenticated connection " + conn.remoteAddr)
+				continue
+			}
+			var update models.NpcUpdateData
+			_ = json.Unmarshal(raw, &update)
+			mu.Lock()
+			npcs = make(map[string]npcData, len(update.Npcs))
+			for _, npc := range update.Npcs {
+				npcs[npc.Id] = npc
+			}
+			mu.Unlock()
 		default:
 			log.Println("--------------------------")
 			log.Println("Unknown event: " + msg.EventName)
@@ -234,8 +267,6 @@ func wsGetBackgroundCards(conn *safeConn) {
 }
 
 var lastBroadcastTime int64 = 0
-var lastBlackHole int64 = 0
-var newBlackHoleInterval int64 = 30000 // 30 seconds
 
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
@@ -253,7 +284,7 @@ func broadCastIntervalLoop() {
 	var currentTime = time.Now().UnixMilli()
 
 	// send at least every 2 seconds or if there are any new bullets, players, or kills to send
-	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList)+len(blackHoles) == 0 && currentTime-lastBroadcastTime < 2000) {
+	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList)+len(npcs) == 0 && currentTime-lastBroadcastTime < 2000) {
 		return
 	}
 	lastBroadcastTime = currentTime
@@ -263,8 +294,6 @@ func broadCastIntervalLoop() {
 		playerIds = append(playerIds, id)
 	}
 
-	moveNPCs()
-
 	var payload = map[string]any{
 		"eventName":       "gameBroadcast",
 		"bulletsToRemove": bulletsToRemove,
@@ -272,13 +301,7 @@ func broadCastIntervalLoop() {
 		"players":         playersToSend,
 		"kills":           killsList,
 		"activePlayerIds": playerIds,
-		"blackHoles":      blackHoles,
-	}
-
-	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval && len(blackHoles) < 10 {
-		var blackHole = createNewBlackHole()
-		blackHoles[blackHole.Id] = blackHole
-		lastBlackHole = currentTime
+		"npcs":            npcs,
 	}
 
 	conns := make([]*safeConn, 0, len(userConnections))
@@ -295,75 +318,23 @@ func broadCastIntervalLoop() {
 	}
 }
 
-func createNewBlackHole() models.BlackHoleData {
-	var minX, minY, maxX, maxY float32
-	first := true
-	for id := range Players {
-		if first {
-			minX = Players[id].X
-			minY = Players[id].Y
-			maxX = Players[id].X
-			maxY = Players[id].Y
-			first = false
-			continue
-		}
-
-		minX = min(minX, Players[id].X)
-		minY = min(minY, Players[id].Y)
-		maxX = max(maxX, Players[id].X)
-		maxY = max(maxY, Players[id].Y)
+// isNpcAuthValid only allows NPC controller connections (ships-npc) coming
+// from localhost and presenting the shared secret configured via the
+// NPC_SECRET env var, so a stray websocket client can't inject fake NPCs.
+func isNpcAuthValid(conn *safeConn, secret string) bool {
+	expectedSecret := os.Getenv("NPC_SECRET")
+	if expectedSecret == "" || secret != expectedSecret {
+		return false
 	}
-
-	minX -= 2000
-	maxX += 2000
-	minY -= 2000
-	maxY += 2000
-
-	var rangeX = maxX - minX
-	var rangeY = maxY - minY
-
-	var blackHole = models.BlackHoleData{
-		Type:      models.NpcTypes.BlackHole,
-		X:         rand.Float64()*float64(rangeX) + float64(minX),
-		Y:         rand.Float64()*float64(rangeY) + float64(minY),
-		Scale:     0.01,
-		MaxSize:   800,
-		Direction: rand.Float64() * 360,
-		Duration:  180000,
-		Id:        time.Now().UnixMilli(),
-		Speed:     7.5,
-	}
-
-	return blackHole
+	return isLoopbackAddr(conn.remoteAddr)
 }
-func moveNPCs() {
-	blackHoleIdsToRemove := []int64{}
-	for id, blackHole := range blackHoles {
-		var currentDuration = time.Now().UnixMilli() - id
-		var maxDuration = int64(blackHole.Duration)
-		var inTime = currentDuration < maxDuration
-		var scaleInc = float64(0.01)
 
-		if inTime && blackHole.Scale < 1.0 {
-			blackHole.Scale += scaleInc
-		} else if !inTime && blackHole.Scale <= 0.01 {
-			blackHoleIdsToRemove = append(blackHoleIdsToRemove, id)
-			continue
-		} else if !inTime && blackHole.Scale > 0.01 {
-			blackHole.Scale -= scaleInc
-		}
-
-		// Move the black hole in the direction it's facing
-		radians := blackHole.Direction * (3.141592653589793 / 180) // Convert degrees to radians
-		speed := blackHole.Speed                                   // Adjust this value for desired speed
-		blackHole.X += speed * float64(math.Cos(radians))
-		blackHole.Y += speed * float64(math.Sin(radians))
-
-		// Update the black hole in the map
-		blackHoles[id] = blackHole
+func isLoopbackAddr(remoteAddr string) bool {
+	host := remoteAddr
+	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		host = h
 	}
-
-	for _, id := range blackHoleIdsToRemove {
-		delete(blackHoles, id)
-	}
+	host = strings.Trim(host, "[]")
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

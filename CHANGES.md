@@ -1,5 +1,15 @@
 CHANGES
 =======
+Version 1.2.0 - 2026-09-XX
+------------------
+- NPC simulation (black holes) moved out to the new `ships-npc` service.
+  ships-go no longer spawns/moves NPCs itself: it relays whatever
+  `ships-npc` sends via the new `npcAuth`/`npcUpdate` websocket events.
+- `gameBroadcast` payload field renamed `blackHoles` -> `npcs` (generic,
+  ready for multiple NPC kinds/instances).
+- New `NPC_SECRET` env var required to authenticate NPC controller
+  connections (also restricted to localhost).
+
 Version 1.1.0 - 2026-09-04
 ------------------
 - New black hole managed from backend

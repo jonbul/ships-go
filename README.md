@@ -27,9 +27,25 @@ Required for 1.0 and deploy
 
 # env
 
-- Create a `.env` file in the project root
+- `.env` lives in `../files/.env` (shared with `ships-npc`, and `ssl` certs
+  in `../files/ssl` shared with `ships-vue`), symlinked into this project's
+  root as `.env`/`ssl`. See `scripts/README.md` ("Shared config") for details
+  and how `scripts/runDevEnvironment.sh` sets this up automatically.
 - Required: `MONGODB_URI`
+- `NPC_SECRET`: shared secret used to authenticate the `ships-npc` websocket
+  connection (see `ships-npc`). NPC controller connections must also come
+  from localhost.
 - WIP
+
+# NPCs (black holes, etc.)
+
+NPC simulation (spawning, movement, lifecycle) no longer lives in this
+service. It's owned by the sibling `ships-npc` project, which connects to
+this server's `/ws` endpoint like a regular player, authenticates with the
+`npcAuth` event (checked against `NPC_SECRET` + localhost), and pushes the
+full current NPC batch on every tick via the `npcUpdate` event. ships-go just
+stores the latest snapshot and relays it to players as `npcs` in the
+`gameBroadcast` payload.
 
 # Prerequisites
 

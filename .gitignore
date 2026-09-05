@@ -4,9 +4,13 @@
 # build file
 ships 
 
-#certs
-ssl/*
+#certs (ssl/ and .env are symlinks to ../files/, which lives outside the
+# repo and is not committed)
+ssl
 
 # Others
 __debug_bin*
 .idea
+
+# dev environment logs
+scripts/logs/

@@ -54,16 +54,36 @@ type BulletData struct {
 	Y             float32 `json:"y" bson:"y"`
 }
 
-type BlackHoleData struct {
+// NpcData is the generic shape used for every NPC kind (black hole, and any
+// future NPC types). NPCs are simulated by the ships-npc service and pushed
+// to ships-go over a websocket connection, similarly to how a player pushes
+// playerData.
+type NpcData struct {
 	Type      string  `json:"type" bson:"type"`
+	Id        string  `json:"id" bson:"id"`
 	X         float64 `json:"x" bson:"x"`
 	Y         float64 `json:"y" bson:"y"`
 	Scale     float64 `json:"scale" bson:"scale"`
 	MaxSize   int     `json:"maxSize" bson:"maxSize"`
 	Direction float64 `json:"direction" bson:"direction"`
 	Duration  int     `json:"duration" bson:"duration"`
-	Id        int64   `json:"id" bson:"id"`
 	Speed     float64 `json:"speed" bson:"speed"`
+}
+
+// NpcAuthData is sent once by ships-npc right after connecting, to
+// authenticate the connection as an NPC controller rather than a player.
+type NpcAuthData struct {
+	EventName string `json:"eventName" bson:"eventName"`
+	Secret    string `json:"secret" bson:"secret"`
+}
+
+// NpcUpdateData carries the full, current set of NPCs simulated by
+// ships-npc. Sending the whole batch each time (instead of per-NPC deltas)
+// keeps ships-go stateless/authoritative-follower and avoids desync, while
+// still being cheap since the NPC count is small.
+type NpcUpdateData struct {
+	EventName string    `json:"eventName" bson:"eventName"`
+	Npcs      []NpcData `json:"npcs" bson:"npcs"`
 }
 
 // private struct to hold NPC types
