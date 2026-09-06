@@ -26,6 +26,9 @@ var (
 		EnemyShipFireRateMs:     500,
 		MaxBlackHoles:           2,
 		BlackHoleSpawnPeriodSec: 30,
+		// Off by default: NPCs fighting each other changes the feel of the
+		// game a lot, so it is opt-in from the admin panel.
+		EnemyShipsFightEachOther: false,
 	}
 )
 
@@ -51,7 +54,7 @@ func SetNpcSettings(settings models.NpcSettingsData) {
 	mu.Lock()
 	npcConns := make([]*safeConn, 0, 1)
 	for _, c := range userConnections {
-		if c.isNpc {
+		if c.isNpc.Load() {
 			npcConns = append(npcConns, c)
 		}
 	}

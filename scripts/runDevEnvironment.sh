@@ -19,12 +19,19 @@
 #   - Does NOT create ../files/.env: it holds secrets (MONGODB_URI,
 #     NPC_SECRET, etc.) that must be provided manually.
 #
-# Logs: if run from inside a Konsole window, ships-go/ships-npc/ships-vue
-# are each opened in their own new Konsole tab, so every project's log is
-# visible on its own tab (Ctrl+C or closing a tab stops just that service).
-# Otherwise (no Konsole, e.g. over SSH), they run in the background here and
-# their output is both printed and saved to ./logs/*.log - open extra
-# terminal tabs and `tail -f scripts/logs/<name>.log` to follow each one.
+# Logs: ships-go/ships-npc/ships-vue run in the background here, their
+# output is saved to ./logs/*.log, and this script opens viewLogs.sh: a
+# tabbed console viewer showing one project's log at a time with a tab bar,
+# pinned to the top line, naming the one you are looking at, so the three
+# streams are no longer interleaved into an unreadable mess. It works the
+# same in every terminal - a plain console, over SSH or VS Code's
+# integrated terminal.
+#   [1-3] pick a project   [Tab] next   [a] merged view
+#   [PgUp/PgDn] scroll back without losing the tab bar   [End] live again
+#   [d]   detach (services keep running)   [q] quit and stop them
+# Run scripts/viewLogs.sh on its own at any time to (re)attach.
+# Pass --no-ui to get the plain interleaved output instead, or
+# --konsole-tabs (inside Konsole only) to open one Konsole tab per project.
 #
 # Press Ctrl+C to stop ships-go, ships-npc and ships-vue started in THIS
 # terminal (background mode). The MongoDB container is left running; use
@@ -81,9 +88,31 @@ ensure_shared_config() {
 }
 
 PIDS=()
+DETACHED=false
 USE_TABS=false
-if command -v konsole >/dev/null 2>&1 && [ -n "$KONSOLE_DBUS_SESSION" ]; then
-    USE_TABS=true
+USE_LOG_UI=true
+
+# --no-ui restores the old behaviour (plain interleaved output), which is
+# what you want when piping this script's output somewhere or running it
+# from a non-interactive context like CI.
+for arg in "$@"; do
+    case "$arg" in
+        --no-ui) USE_LOG_UI=false ;;
+        --konsole-tabs) USE_TABS=true ;;
+    esac
+done
+
+if [ "$USE_TABS" = true ] &&
+    ! { command -v konsole >/dev/null 2>&1 && [ -n "${KONSOLE_DBUS_SESSION:-}" ]; }; then
+    echo "  (--konsole-tabs ignored: not running inside Konsole)" >&2
+    USE_TABS=false
+fi
+# The tabbed viewer is the default in every terminal, Konsole included, so
+# the dev environment looks and works the same in a plain console, over SSH
+# and in VS Code. It still needs a real terminal to draw on, and only makes
+# sense when the services are logging here rather than into Konsole tabs.
+if [ "$USE_TABS" = true ] || [ ! -t 0 ] || [ ! -t 1 ]; then
+    USE_LOG_UI=false
 fi
 
 # run_service NAME DIR COMMAND...
@@ -96,20 +125,46 @@ run_service() {
         konsole --new-tab -p tabtitle="$name" \
             -e bash -c "cd '$dir' && { $*; }; echo; echo '[$name] exited, press Enter to close this tab.'; read" &
         echo "  $name -> opened in a new Konsole tab"
+    elif [ "$USE_LOG_UI" = true ]; then
+        # The viewer owns the terminal, so the service must write to its log
+        # only - tee-ing to stdout as well would scribble over the UI.
+        #
+        # setsid puts the service in its own process group so cleanup can
+        # signal the whole tree. `go run .` compiles to a temporary binary
+        # and execs it as a child, so killing just the pid recorded here
+        # leaves that binary running - which is how a stray ships-npc once
+        # survived a restart and ended up fighting the new one for control
+        # of the NPCs.
+        setsid bash -c "cd '$dir' && exec \"\$@\"" _ "$@" > "$LOG_DIR/$name.log" 2>&1 &
+        PIDS+=($!)
+        echo "  $name -> logging to $LOG_DIR/$name.log"
     else
-        (cd "$dir" && "$@") > >(tee "$LOG_DIR/$name.log") 2>&1 &
+        setsid bash -c "cd '$dir' && exec \"\$@\"" _ "$@" > >(tee "$LOG_DIR/$name.log") 2>&1 &
         PIDS+=($!)
         echo "  $name -> background, logging to $LOG_DIR/$name.log"
     fi
 }
 
 cleanup() {
+    if [ "$DETACHED" = true ]; then
+        return 0
+    fi
+    if [ ${#PIDS[@]} -eq 0 ]; then
+        # Konsole mode: each service owns its tab and nothing was started in
+        # the background here. A bare `wait` would not be a no-op - it waits
+        # for *every* child, i.e. the konsole tabs, and never returns.
+        return 0
+    fi
     echo ""
     echo "Stopping services started in this terminal..."
     for pid in "${PIDS[@]}"; do
-        kill "$pid" 2>/dev/null
+        # Negative pid = the whole process group (see setsid in run_service),
+        # so `go run`'s compiled child dies with it instead of being orphaned.
+        kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
     done
-    wait "${PIDS[@]}" 2>/dev/null
+    # `wait` reports the signal that killed each service (143 = SIGTERM),
+    # which under `set -e` would abort this handler before it finishes.
+    wait "${PIDS[@]}" 2>/dev/null || true
     echo "Dev environment stopped (MongoDB container left running)."
 }
 trap cleanup EXIT INT TERM
@@ -137,10 +192,28 @@ echo ""
 if [ "$USE_TABS" = true ]; then
     echo "Dev environment is up: check the new Konsole tabs for each project's log."
     echo "This tab is now free; MongoDB was already started above."
+elif [ "$USE_LOG_UI" = true ]; then
+    echo "Dev environment is up. Opening the tabbed log viewer..."
+    echo "  [1-3] pick a project   [a] all   [PgUp/PgDn] scroll   [d] detach   [q] quit + stop"
+    sleep 1
+    # Foreground, so this terminal becomes the viewer. It exits 10 when the
+    # user detaches, which must leave the services running.
+    set +e
+    ./viewLogs.sh --log-dir "$LOG_DIR" ships-go ships-npc ships-vue
+    viewer_status=$?
+    set -e
+    if [ "$viewer_status" -eq 10 ]; then
+        DETACHED=true
+        echo "Detached. ships-go, ships-npc and ships-vue are still running."
+        echo "  reattach: $SCRIPT_DIR/viewLogs.sh"
+        echo "  stop:     for p in ${PIDS[*]}; do kill -- -\$p; done"
+        exit 0
+    fi
 else
     echo "Dev environment is up: ships-go, ships-npc and ships-vue are running in the"
     echo "background, logging to $LOG_DIR/*.log. Open new terminal tabs and run e.g.:"
     echo "  tail -f $LOG_DIR/ships-go.log"
+    echo "  (or $SCRIPT_DIR/viewLogs.sh for a tabbed view of all three)"
     echo "Press Ctrl+C here to stop everything."
-    wait "${PIDS[@]}"
+    wait "${PIDS[@]}" || true
 fi

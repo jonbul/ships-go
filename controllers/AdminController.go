@@ -52,7 +52,7 @@ func getAdminGameData(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{
-		"players":     websocket.Players,
+		"players":     websocket.SnapshotPlayers(),
 		"resultCards": websocket.BackgroundCards,
 	})
 }

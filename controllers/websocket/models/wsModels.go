@@ -9,16 +9,22 @@ type PlayerData struct {
 	EventName string `json:"eventName" bson:"eventName"`
 	SocketId  string `json:"socketId" bson:"socketId"`
 	//—————————————————————————————————————————————————————————————————————
-	Credits      int     `json:"credits" bson:"credits"`
-	Deaths       int     `json:"deaths" bson:"deaths"`
-	Hide         bool    `json:"hidden" bson:"hidden"`
-	IsDead       bool    `json:"isDead" bson:"isDead"`
-	Kills        int     `json:"kills" bson:"kills"`
-	Life         float32 `json:"life" bson:"life"`
-	Name         string  `json:"name" bson:"name"`
-	Rotate       float32 `json:"rotate" bson:"rotate"`
-	Scale        float32 `json:"scale" bson:"scale"`
-	ShipId       string  `json:"shipId" bson:"shipId"`
+	Credits int     `json:"credits" bson:"credits"`
+	Deaths  int     `json:"deaths" bson:"deaths"`
+	Hide    bool    `json:"hide" bson:"hide"`
+	IsDead  bool    `json:"isDead" bson:"isDead"`
+	Kills   int     `json:"kills" bson:"kills"`
+	Life    float32 `json:"life" bson:"life"`
+	Name    string  `json:"name" bson:"name"`
+	Rotate  float32 `json:"rotate" bson:"rotate"`
+	Scale   float32 `json:"scale" bson:"scale"`
+	ShipId  string  `json:"shipId" bson:"shipId"`
+	// Width/Height are the player's raw (unscaled) ship size, sent by the
+	// client because shipId alone cannot identify it: GET /game/getShips
+	// only lists public ships, so a player's own painting project is a ship
+	// nobody else can look up. ships-npc aims with these.
+	Width        float32 `json:"width" bson:"width"`
+	Height       float32 `json:"height" bson:"height"`
 	X            float32 `json:"x" bson:"x"`
 	Xtranslation float32 `json:"xTranslation" bson:"xTranslation"`
 	Y            float32 `json:"y" bson:"y"`
@@ -71,11 +77,21 @@ type NpcData struct {
 	Speed     float64 `json:"speed" bson:"speed"`
 	// Ship NPC fields (Type == NpcTypes.Ship): a hostile NPC using one of
 	// the public ships, rendered/collided exactly like a player.
-	ShipId  string  `json:"shipId,omitempty" bson:"shipId,omitempty"`
-	Name    string  `json:"name,omitempty" bson:"name,omitempty"`
-	Rotate  float32 `json:"rotate,omitempty" bson:"rotate,omitempty"`
+	ShipId string `json:"shipId,omitempty" bson:"shipId,omitempty"`
+	Name   string `json:"name,omitempty" bson:"name,omitempty"`
+	// Rotate is NOT omitempty: 0 is a perfectly legal heading (due east),
+	// and it is exactly what a ship spawns with. Omitting it made
+	// ships-vue's NPC update path assign `undefined`, which turned the
+	// ship's position and collision box into NaN - an enemy ship that was
+	// invisible and impossible to hit.
+	Rotate  float32 `json:"rotate" bson:"rotate"`
 	Life    float32 `json:"life,omitempty" bson:"life,omitempty"`
 	MaxLife float32 `json:"maxLife,omitempty" bson:"maxLife,omitempty"`
+	// Kills/Deaths let ships-vue list NPC ships in the scoreboard alongside
+	// the players. Not omitempty: a zero score is meaningful and must still
+	// reach the client instead of silently reading as "unknown".
+	Kills  int `json:"kills" bson:"kills"`
+	Deaths int `json:"deaths" bson:"deaths"`
 }
 
 // NpcAuthData is sent once by ships-npc right after connecting, to
@@ -106,6 +122,12 @@ type NpcSettingsData struct {
 	EnemyShipFireRateMs     int     `json:"enemyShipFireRateMs" bson:"enemyShipFireRateMs"`
 	MaxBlackHoles           int     `json:"maxBlackHoles" bson:"maxBlackHoles"`
 	BlackHoleSpawnPeriodSec int     `json:"blackHoleSpawnPeriodSec" bson:"blackHoleSpawnPeriodSec"`
+	// EnemyShipsFightEachOther makes NPC ships treat each other as valid
+	// targets instead of only hunting players. Deliberately not
+	// `omitempty`: false is a meaningful value here, and an admin turning
+	// the toggle off must actually turn it off downstream rather than have
+	// the field vanish and leave ships-npc on its previous value.
+	EnemyShipsFightEachOther bool `json:"enemyShipsFightEachOther" bson:"enemyShipsFightEachOther"`
 }
 
 // Sanitized clamps settings into workable ranges. ships-npc clamps again

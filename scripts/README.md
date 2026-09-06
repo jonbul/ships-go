@@ -85,14 +85,57 @@ bash runDevEnvironment.sh
     time; the script prints a warning if it's missing.
 - It then runs `runMongoContainer.sh` and waits for MongoDB to accept
   connections before starting `ships-go`, `ships-npc` and `ships-vue`.
-- Logs: if run from inside a **Konsole** window, each of `ships-go`,
-  `ships-npc` and `ships-vue` opens in its own new Konsole tab. In any other
-  terminal (including VS Code's integrated terminal, which isn't Konsole
-  and can't be scripted to open tabs), they run in the background here and
-  also log to `scripts/logs/<name>.log` — open extra terminal tabs and run
-  `tail -f scripts/logs/ships-go.log` to follow each one.
+- Logs: `ships-go`, `ships-npc` and `ships-vue` run in the background and
+  the script opens the **tabbed log viewer** described below, so the three
+  logs stay separated instead of being interleaved in one stream. This is
+  now the default in every terminal — a plain console, over SSH or VS Code's
+  integrated terminal — so the dev environment always behaves the same way.
+  Everything is still written to `scripts/logs/<name>.log`, so `tail -f`
+  keeps working too. Inside Konsole you can still pass `--konsole-tabs` to
+  get the old one-real-tab-per-service behaviour.
 - Press Ctrl+C to stop whatever this script started in the background
   (non-Konsole mode). The MongoDB container is left running either way.
+
+## Tabbed log viewer (`viewLogs.sh`)
+
+`viewLogs.sh` shows one log per tab in a single terminal, with a tab bar on
+the top line and the selected log scrolling underneath. It's plain bash +
+ANSI escapes: no `tmux`, `screen` or any other dependency.
+
+`runDevEnvironment.sh` opens it automatically. You can also run it on its own
+at any time — including while the dev environment is already running, to
+reattach after detaching — since it only reads the log files:
+
+```bash
+bash viewLogs.sh                     # reads scripts/logs/
+bash viewLogs.sh --log-dir /some/dir # any directory of .log files
+```
+
+The tab bar always stays on the top line: row 1 is kept outside the
+terminal's scrolling region, it is repainted twice a second so a stray
+escape sequence in a log line can't leave it stale, and the viewer runs on
+the alternate screen so the terminal's own scrollback can't drag it out of
+view. To look back through a log, use the keys below instead — the bar stays
+put and tells you whether you're watching live output (`LIVE`) or a frozen
+window (`SCROLLED -n`).
+
+| Key | Action |
+|-----|--------|
+| `1`-`9` | Jump to that tab |
+| `Tab` / `→` | Next tab |
+| `Shift+Tab` / `←` | Previous tab |
+| `a` | **All** tab: the three logs merged, each line prefixed with a coloured service name |
+| `↑` / `↓` | Scroll back/forward one line (pauses following) |
+| `PgUp` / `PgDn` | Scroll a page |
+| `Home` | Oldest line |
+| `End` / `f` / `G` | Back to the live tail |
+| `c` | Clear the screen (the log file itself is untouched) |
+| `r` | Reload the current log from the start |
+| `d` | **Detach**: leave the viewer but keep the services running |
+| `q` | Quit; when launched by `runDevEnvironment.sh` this also stops the services |
+
+Pass `--no-ui` to `runDevEnvironment.sh` if you'd rather have the old plain
+interleaved output.
 
 ## Shared config (`files/`)
 
