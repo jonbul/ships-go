@@ -20,15 +20,31 @@ import (
 var (
 	npcSettingsMu sync.RWMutex
 	npcSettings   = models.NpcSettingsData{
+		// The hand-written controller only, to start: the learned policy
+		// is opt-in, and "both" doubles the number of ships in play.
+		EnemyShipController:     models.NpcControllerRule,
 		EnemyShips:              1,
-		EnemyShipLife:           10,
+		AiShips:                 1,
+		ShipLife:                models.DefaultShipLife,
 		EnemyShipSpeed:          20,
 		EnemyShipFireRateMs:     500,
 		MaxBlackHoles:           2,
 		BlackHoleSpawnPeriodSec: 30,
-		// Off by default: NPCs fighting each other changes the feel of the
-		// game a lot, so it is opt-in from the admin panel.
-		EnemyShipsFightEachOther: false,
+		BlackHoleDurationSec:    models.DefaultBlackHoleDurationSec,
+		// Ramming hurts by default, and hurts everyone equally. Ships
+		// growing with their score is deliberately opt-in: it is the zero
+		// value, but stated here because "off" is a decision rather than an
+		// oversight.
+		ContactDamage: true,
+		KillScaling:   false,
+		// The size ships-vue drew every ship at before this was
+		// configurable, so an untouched deployment plays as it always has.
+		ShipSize: models.DefaultShipSize,
+		// Both fleets hunt players and nothing else. NPCs fighting each
+		// other changes the feel of the game a lot, so every other cell of
+		// the attack matrix is opt-in from the admin panel.
+		NpcAttacksPlayers: true,
+		AiAttacksPlayers:  true,
 	}
 )
 
@@ -53,15 +69,38 @@ func SetNpcSettings(settings models.NpcSettingsData) {
 	// never block the game loop, which takes the same lock every tick.
 	mu.Lock()
 	npcConns := make([]*safeConn, 0, 1)
+	playerConns := make([]*safeConn, 0, len(userConnections))
 	for _, c := range userConnections {
 		if c.isNpc.Load() {
 			npcConns = append(npcConns, c)
+			continue
 		}
+		playerConns = append(playerConns, c)
 	}
 	mu.Unlock()
 
 	for _, c := range npcConns {
 		sendNpcSettings(c)
+	}
+	// Players are told too, so contact damage stops the moment it is
+	// switched off rather than at each player's next page load.
+	for _, c := range playerConns {
+		sendGameSettings(c)
+	}
+}
+
+// sendGameSettings pushes the rules a browser enforces for itself to one
+// player connection.
+func sendGameSettings(conn *safeConn) {
+	settings := GetNpcSettings()
+	if err := conn.writeJSON(models.GameSettingsData{
+		EventName:     "gameSettings",
+		ContactDamage: settings.ContactDamage,
+		KillScaling:   settings.KillScaling,
+		ShipSize:      settings.ShipSize,
+		ShipLife:      settings.ShipLife,
+	}); err != nil {
+		log.Println("Failed to send gameSettings to " + conn.remoteAddr + ": " + err.Error())
 	}
 }
 

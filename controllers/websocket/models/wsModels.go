@@ -116,18 +116,74 @@ type NpcUpdateData struct {
 // pushes them to the NPC controller connection as an NpcConfigData event.
 // ships-npc mirrors this struct and is the one that clamps/validates them.
 type NpcSettingsData struct {
-	EnemyShips              int     `json:"enemyShips" bson:"enemyShips"`
-	EnemyShipLife           float32 `json:"enemyShipLife" bson:"enemyShipLife"`
+	// EnemyShipController selects which brains fly the hostile ships:
+	// "none", "rule" (the hand-written controller), "ai" (ships-npc's
+	// embedded learned policy) or "both". Each fleet keeps its own size,
+	// so switching away and back does not lose the number that was set.
+	EnemyShipController string `json:"enemyShipController" bson:"enemyShipController"`
+	EnemyShips          int    `json:"enemyShips" bson:"enemyShips"`
+	AiShips             int    `json:"aiShips" bson:"aiShips"`
+	// ShipLife is the life every ship enters the game with, players
+	// included - the number ships-vue used to hardcode as 10. Like
+	// ContactDamage it is a rule the browser enforces for itself, so it
+	// travels in GameSettingsData too. Changing it does not heal or hurt
+	// anybody already flying: a ship keeps the life it spawned with until
+	// it dies, exactly as an NPC does.
+	ShipLife                float32 `json:"shipLife" bson:"shipLife"`
 	EnemyShipSpeed          float64 `json:"enemyShipSpeed" bson:"enemyShipSpeed"`
 	EnemyShipFireRateMs     int     `json:"enemyShipFireRateMs" bson:"enemyShipFireRateMs"`
 	MaxBlackHoles           int     `json:"maxBlackHoles" bson:"maxBlackHoles"`
 	BlackHoleSpawnPeriodSec int     `json:"blackHoleSpawnPeriodSec" bson:"blackHoleSpawnPeriodSec"`
-	// EnemyShipsFightEachOther makes NPC ships treat each other as valid
-	// targets instead of only hunting players. Deliberately not
-	// `omitempty`: false is a meaningful value here, and an admin turning
-	// the toggle off must actually turn it off downstream rather than have
-	// the field vanish and leave ships-npc on its previous value.
-	EnemyShipsFightEachOther bool `json:"enemyShipsFightEachOther" bson:"enemyShipsFightEachOther"`
+	// BlackHoleDurationSec is how long a black hole lives before it starts
+	// shrinking away. Applied live, so shortening it can clear black holes
+	// that are already on the map.
+	BlackHoleDurationSec int `json:"blackHoleDurationSec" bson:"blackHoleDurationSec"`
+	// ContactDamage is the odd one out: it applies to players as well as
+	// NPCs, so it is also broadcast to every browser as a GameSettingsData
+	// event. It lives here because it is one rule about one thing - what
+	// happens when two ships touch - and splitting it across two settings
+	// stores would only let the halves disagree.
+	ContactDamage bool `json:"contactDamage" bson:"contactDamage"`
+	// KillScaling makes a player's ship grow with (kills - deaths). Like
+	// ContactDamage it is a rule the browser enforces for itself, so it
+	// travels in GameSettingsData as well. Off by default: it is a large
+	// change to how the game plays, and it also changes a ship's collision
+	// box, so it is opt-in rather than something a new deployment inherits.
+	KillScaling bool `json:"killScaling" bson:"killScaling"`
+	// ShipSize is the size every ship is normalised to when it enters the
+	// game, whatever its artwork measures - the number ships-vue used to
+	// hardcode as 100. It is a rule about every ship, players included, so
+	// it travels in GameSettingsData too, and ships-npc needs it to know
+	// how big the ships it is flying actually are.
+	ShipSize int `json:"shipSize" bson:"shipSize"`
+	// The attack matrix: for each kind of attacker, which factions it may
+	// hunt and damage. Any combination is allowed, including a fleet that
+	// fights itself and one that attacks nothing.
+	//
+	// Deliberately none of them `omitempty`: false is a meaningful value
+	// here, and an admin clearing a box must actually clear it downstream
+	// rather than have the field vanish and leave ships-npc on its
+	// previous value.
+	NpcAttacksPlayers bool `json:"npcAttacksPlayers" bson:"npcAttacksPlayers"`
+	NpcAttacksNpc     bool `json:"npcAttacksNpc" bson:"npcAttacksNpc"`
+	NpcAttacksAi      bool `json:"npcAttacksAi" bson:"npcAttacksAi"`
+	AiAttacksPlayers  bool `json:"aiAttacksPlayers" bson:"aiAttacksPlayers"`
+	AiAttacksNpc      bool `json:"aiAttacksNpc" bson:"aiAttacksNpc"`
+	AiAttacksAi       bool `json:"aiAttacksAi" bson:"aiAttacksAi"`
+}
+
+// GameSettingsData carries the rules a *player's* browser has to enforce
+// itself. Ship-to-ship contact is resolved client-side (each client damages
+// only itself, which comes out symmetric because every client runs the same
+// check), so switching contact damage off has to reach the browsers as well
+// as ships-npc, or players would keep hurting each other after an admin
+// turned it off. Sent on connection and again whenever an admin saves.
+type GameSettingsData struct {
+	EventName     string  `json:"eventName"`
+	ContactDamage bool    `json:"contactDamage"`
+	KillScaling   bool    `json:"killScaling"`
+	ShipSize      int     `json:"shipSize"`
+	ShipLife      float32 `json:"shipLife"`
 }
 
 // Sanitized clamps settings into workable ranges. ships-npc clamps again
@@ -136,9 +192,17 @@ type NpcSettingsData struct {
 // force instead of showing a number that was silently rejected downstream.
 // The bounds are duplicated in ships-npc's npcSettings.sanitized().
 func (s NpcSettingsData) Sanitized() NpcSettingsData {
-	s.EnemyShips = clampInt(s.EnemyShips, 0, 20)
-	if s.EnemyShipLife <= 0 {
-		s.EnemyShipLife = 10
+	switch s.EnemyShipController {
+	case NpcControllerNone, NpcControllerRule, NpcControllerAi, NpcControllerBoth:
+	default:
+		// An unrecognised value would otherwise mean "none" downstream,
+		// so a typo or an older client would silently empty the map.
+		s.EnemyShipController = NpcControllerRule
+	}
+	s.EnemyShips = clampInt(s.EnemyShips, 0, MaxNpcFleetSize)
+	s.AiShips = clampInt(s.AiShips, 0, MaxNpcFleetSize)
+	if s.ShipLife <= 0 {
+		s.ShipLife = DefaultShipLife
 	}
 	if s.EnemyShipSpeed <= 0 {
 		s.EnemyShipSpeed = 20
@@ -147,8 +211,22 @@ func (s NpcSettingsData) Sanitized() NpcSettingsData {
 		s.EnemyShipSpeed = maxGameSpeed
 	}
 	s.EnemyShipFireRateMs = clampInt(s.EnemyShipFireRateMs, 100, 600000)
+	// Zero means "not set" - an older settings document, or a client that
+	// doesn't know about the field - and has to fall back to the default
+	// rather than clamp up to the minimum, which would shrink every ship.
+	if s.ShipSize <= 0 {
+		s.ShipSize = DefaultShipSize
+	}
+	s.ShipSize = clampInt(s.ShipSize, MinShipSize, MaxShipSize)
 	s.MaxBlackHoles = clampInt(s.MaxBlackHoles, 0, 50)
 	s.BlackHoleSpawnPeriodSec = clampInt(s.BlackHoleSpawnPeriodSec, 1, 86400)
+	// Zero means "not set" and takes the default, for the same reason as
+	// ShipSize above: clamping up to the minimum would make every black
+	// hole a blink-and-miss-it one.
+	if s.BlackHoleDurationSec <= 0 {
+		s.BlackHoleDurationSec = DefaultBlackHoleDurationSec
+	}
+	s.BlackHoleDurationSec = clampInt(s.BlackHoleDurationSec, 5, 86400)
 	return s
 }
 
@@ -156,6 +234,37 @@ func (s NpcSettingsData) Sanitized() NpcSettingsData {
 // expressed in the game's own speed units, so this is "as fast as a player
 // at full throttle".
 const maxGameSpeed = 50
+
+// The controller choices, mirrored in ships-npc's settings.go.
+const (
+	NpcControllerNone = "none"
+	NpcControllerRule = "rule"
+	NpcControllerAi   = "ai"
+	NpcControllerBoth = "both"
+)
+
+// MaxNpcFleetSize caps *each* fleet, so "both" at the maximum is twice
+// this many ships. It is high enough to be a load test rather than a
+// gameplay setting; ships-npc clamps to the same number.
+const MaxNpcFleetSize = 100
+
+// The bounds on the standard ship size, mirrored in ships-npc. The lower
+// one keeps a ship big enough to see and to hit; the upper one keeps a
+// fleet from filling the screen. DefaultShipSize is what ships-vue drew at
+// before this was configurable, so an existing game plays identically.
+// DefaultBlackHoleDurationSec is how long a black hole lived before this
+// was configurable.
+const DefaultBlackHoleDurationSec = 180
+
+const (
+	MinShipSize     = 20
+	MaxShipSize     = 1000
+	DefaultShipSize = 100
+)
+
+// DefaultShipLife is the life every ship - player, NPC or AI - used to be
+// hardcoded with in ships-vue and ships-npc alike.
+const DefaultShipLife = 10
 
 func clampInt(value, minValue, maxValue int) int {
 	if value < minValue {

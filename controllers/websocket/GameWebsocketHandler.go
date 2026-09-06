@@ -193,6 +193,10 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 			log.Println("New connection with socketId: " + socketId)
 			msg.SocketId = socketId
 			_ = conn.writeJSON(msg)
+			// Sent straight after, so a client that joins mid-game starts
+			// out enforcing the rules currently in force rather than the
+			// defaults compiled into it.
+			sendGameSettings(conn)
 		case "playerData":
 
 			var plData *playerData

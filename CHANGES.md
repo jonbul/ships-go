@@ -17,8 +17,33 @@ round of concurrency fixes in the websocket hub.
   snapshot stranded ghost ships that never moved and could never be killed.
 - `NpcData` carries `kills`/`deaths` so ships-vue can list NPC ships in the
   scoreboard next to the players.
-- New admin setting: enemy ships attack each other. Stored and pushed to
-  ships-npc like every other NPC setting, with no new endpoint.
+- New admin settings for the two NPC fleets: which controllers run (neither,
+  the rule-based one, the AI one, or both), a separate size for each fleet -
+  now up to 100 ships each - and a six-cell matrix saying which fleet may
+  attack players, rule ships and AI ships. Stored and pushed to ships-npc
+  like every other NPC setting, with no new endpoint. They are validated on
+  the way in: an unrecognised controller falls back to the default rather
+  than silently meaning "no NPCs at all".
+- Black hole duration is an admin setting (5s to a day, default the 180s it
+  was fixed at), alongside the existing cap and spawn period.
+- New `gameSettings` event, sent to each player on connection and broadcast
+  again whenever an admin saves. It carries the rules a browser has to
+  enforce for itself: whether ships take damage on contact, whether a ship
+  grows with its score, and the standard size every ship is drawn at (100 by
+  default, the value ships-vue used to hardcode). All three are resolved
+  client-side and so cannot be switched off in one place. The ship size goes
+  to ships-npc as well, since it decides how big the ships it is flying
+  actually are; it is clamped to 20-1000, and an unset value becomes the
+  default rather than the minimum, which would shrink every ship.
+  Sending it live rather than at page load means the change reaches players
+  already in the game.
+- Ship life is one setting for everybody, renamed from `enemyShipLife` to
+  `shipLife` and carried in `gameSettings` as well as `npcConfig`. It was an
+  NPC-only knob, so raising it armoured every NPC while leaving the player on
+  the 10 ships-vue had hardcoded - the opposite of the "same rules for
+  everyone" the other game rules follow. Nothing already flying is healed or
+  hurt by a change; it applies from each ship's next spawn, which is how the
+  NPC side has always read it.
 - Player broadcasts now carry the player's raw ship width/height. A shipId
   alone cannot identify a ship to anyone else, because GET /game/getShips
   lists only the public ones; ships-npc needs the real numbers to aim at the

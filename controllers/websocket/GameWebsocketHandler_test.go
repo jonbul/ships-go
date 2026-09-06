@@ -4,6 +4,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"ships/controllers/websocket/models"
 )
 
 // resetBroadcastState puts the package globals back to a known-empty state so
@@ -126,5 +128,22 @@ func TestBuildBackgroundCardsIsConcurrencySafe(t *testing.T) {
 		if len(col) != 5 {
 			t.Fatalf("column %d is half-built: %d rows", x, len(col))
 		}
+	}
+}
+
+// The running defaults, as opposed to what the wire can carry. These are
+// what a fresh deployment plays with before an admin ever opens the panel,
+// and they are duplicated in ships-npc's defaultNpcSettings().
+func TestDefaultGameRules(t *testing.T) {
+	settings := GetNpcSettings()
+	if !settings.ContactDamage {
+		t.Error("ramming should hurt by default")
+	}
+	if settings.KillScaling {
+		t.Error("ships growing with their score should be off by default")
+	}
+	if settings.ShipSize != models.DefaultShipSize {
+		t.Errorf("ships should default to the size ships-vue used to hardcode: got %d want %d",
+			settings.ShipSize, models.DefaultShipSize)
 	}
 }
