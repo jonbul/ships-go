@@ -73,6 +73,25 @@ round of concurrency fixes in the websocket hub.
   instead `ships_npc_up` drops to 0 - immediately when the controller
   disconnects, or after 30s of silence if it stops reporting without closing
   the socket - and the other series stop being reported at all.
+- New Grafana dashboard for all of the above:
+  `scripts/monitoringContainers/shipsDashboard.json`, importable as it is.
+  Twenty-one panels in five rows: an overview strip, resource usage,
+  simulation load, capacity and the Go runtime.
+
+  The capacity row is the point of it. It divides CPU and tick time by the
+  number of NPCs alive, so the cost of *one* ship can be read off the graph
+  and multiplied by a fleet size to predict the load before that fleet is
+  actually flown. A flat line means the simulation scales linearly; a rising
+  one means something in it is quadratic, which ship-vs-ship collision and
+  targeting naturally are. Tick duration is drawn against a `tick_budget_ms`
+  variable, since a tick time only means something next to the interval it
+  has to fit inside.
+
+  Every panel carries a description explaining what it is for and how to read
+  it, so the reasoning shows up in Grafana's own tooltips rather than only in
+  this file. Exported in the shareable `__inputs` format, so importing
+  prompts for the Prometheus datasource instead of carrying a UID from
+  whichever Grafana it was built against.
 - New `scripts/viewLogs.sh`: a tabbed log viewer for the dev environment.
   `runDevEnvironment.sh` used to interleave the ships-go, ships-npc and
   ships-vue logs into a single unreadable stream. Now one tab per service is
