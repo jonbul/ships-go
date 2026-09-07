@@ -3,7 +3,7 @@ set -x # show commands in execution
 
 CONTAINER_NAME="ships-go"
 IMAGE_NAME="ships-go-image"
-ROOT_PATH="/home/jonbul/servers"
+ROOT_PATH="/home/jonbul/servers/ships"
 PROJECT_PATH="$ROOT_PATH/ships-go"
 SSL_PATH="$ROOT_PATH/files/ssl"
 ENV_PATH="$ROOT_PATH/files/.env"

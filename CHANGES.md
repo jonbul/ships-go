@@ -49,6 +49,30 @@ round of concurrency fixes in the websocket hub.
   lists only the public ones; ships-npc needs the real numbers to aim at the
   middle of a player's ship rather than at a guess. Passthrough only - see
   ships-npc/CHANGES.md 1.0.0.
+- **ships-npc's CPU and memory now appear on `/metrics`**, alongside the Go
+  and process collectors that describe this server. The NPC simulation is the
+  most computationally expensive thing in the game, and since it moved out
+  into its own service it was the one part with no monitoring at all: a fleet
+  of 200 ships could be pushing a core flat and nothing said so.
+
+  ships-npc has no HTTP server, and as a websocket client on loopback it is
+  not reachable to be scraped, so it *pushes* a sample up the connection it
+  already has (new `npcMetrics` event, accepted only from the authenticated
+  NPC controller) and this server re-exports it. No new port, listener,
+  credential or Prometheus target - the existing scrape picks it up, so the
+  Grafana side is a new panel rather than a new job. Series:
+  `ships_npc_cpu_seconds_total` (a counter, for `rate()`),
+  `ships_npc_cpu_percent`, `ships_npc_memory_resident_bytes`,
+  `ships_npc_memory_heap_bytes`, `ships_npc_memory_heap_sys_bytes`,
+  `ships_npc_goroutines`, `ships_npc_simulated_npcs`,
+  `ships_npc_tick_seconds` and `ships_npc_up`.
+
+  Collected on demand rather than kept in gauges the handler writes to.
+  Gauges hold their last value forever, so a dead ships-npc would leave the
+  dashboard showing a healthy service frozen at a plausible CPU figure;
+  instead `ships_npc_up` drops to 0 - immediately when the controller
+  disconnects, or after 30s of silence if it stops reporting without closing
+  the socket - and the other series stop being reported at all.
 - New `scripts/viewLogs.sh`: a tabbed log viewer for the dev environment.
   `runDevEnvironment.sh` used to interleave the ships-go, ships-npc and
   ships-vue logs into a single unreadable stream. Now one tab per service is

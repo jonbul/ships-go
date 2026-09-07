@@ -307,3 +307,39 @@ var NpcTypes npcTypes = npcTypes{
 	BlackHole: "BlackHole",
 	Ship:      "Ship",
 }
+
+// NpcMetricsData is ships-npc reporting its own resource usage, so ships-go
+// can re-export it on the /metrics endpoint Prometheus already scrapes.
+//
+// ships-npc is a websocket *client* on localhost with no HTTP server of its
+// own, so this is how its numbers reach Grafana without giving it a port, a
+// listener and a scrape target of its own. It arrives on the authenticated
+// NPC connection like npcUpdate does.
+//
+// Hand-mirrored with npcMetricsMsg in ships-npc/models.go: change both.
+type NpcMetricsData struct {
+	EventName string `json:"eventName"`
+	// Total CPU seconds burned since ships-npc started, user + system. It
+	// only grows, so it is exported as a counter and Grafana can rate() it.
+	CpuSeconds float64 `json:"cpuSeconds"`
+	// The same thing already differentiated by ships-npc, as a percentage
+	// of one core. Both are published: the counter is the one to build
+	// alerts on, the percentage is the one that is readable without a
+	// query.
+	CpuPercent float64 `json:"cpuPercent"`
+	// Resident set size as the OS sees it, then Go's own view of the heap.
+	// Resident is what a container limit kills on; the heap pair says
+	// whether a rise is the game or the runtime. Resident is 0 when it
+	// could not be measured (no /proc), and is then left out of /metrics
+	// rather than published as a zero.
+	ResidentBytes float64 `json:"residentBytes"`
+	HeapBytes     float64 `json:"heapBytes"`
+	HeapSysBytes  float64 `json:"heapSysBytes"`
+	Goroutines    int     `json:"goroutines"`
+	// How many NPCs were being simulated, and the average time one
+	// simulation tick took. These are what make the CPU figure mean
+	// something: the question is how many ships can be flown before a tick
+	// stops fitting inside NPC_TICK_INTERVAL_MS.
+	Npcs        int     `json:"npcs"`
+	TickSeconds float64 `json:"tickSeconds"`
+}

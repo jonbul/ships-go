@@ -150,6 +150,10 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		if socketId == npcControllerId {
 			npcControllerId = ""
 			npcs = make(map[string]npcData)
+			// Its resource metrics go with it: publishing the last sample
+			// of a process that is known to be gone would show a dead
+			// service idling at a plausible-looking CPU figure.
+			clearNpcMetrics()
 			log.Println("NPC controller disconnected, NPCs cleared")
 		}
 		mu.Unlock()
@@ -296,6 +300,18 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 				npcs[npc.Id] = npc
 			}
 			mu.Unlock()
+		case "npcMetrics":
+			if !conn.isNpc.Load() {
+				log.Println("Ignoring npcMetrics from unauthenticated connection " + conn.remoteAddr)
+				continue
+			}
+			var metrics models.NpcMetricsData
+			_ = json.Unmarshal(raw, &metrics)
+			// Its own lock, not the game mutex: this arrives every few
+			// seconds from one connection and is read by a Prometheus
+			// scrape, so there is no reason for it to queue behind the
+			// tick loop.
+			storeNpcMetrics(metrics)
 		case "npcHit":
 			// A player's client detected that its own bullet hit a Ship NPC
 			// (see checkBulletCollision in ships-vue). ships-go doesn't
