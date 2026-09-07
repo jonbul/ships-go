@@ -1,13 +1,17 @@
 package websocket
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"math/rand/v2"
+	"net"
 	"net/http"
+	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,16 +26,39 @@ type bulletData = models.BulletData
 type wsEvent = models.WsEvent
 type playerData = models.PlayerData
 type playerHitData = models.PlayerHitData
+type npcData = models.NpcData
+type npcHitData = models.NpcHitData
 
 type safeConn struct {
-	conn *websocket.Conn
-	mu   sync.Mutex
+	conn       *websocket.Conn
+	mu         sync.Mutex
+	remoteAddr string
+	// isNpc is atomic because it is written by this connection's own reader
+	// goroutine (on npcAuth) but read from others: any player's reader
+	// goroutine relaying an npcHit, and the admin HTTP goroutine pushing
+	// new settings. Guarding it with conn.mu while those readers hold the
+	// global mu instead would be no synchronization at all.
+	isNpc atomic.Bool
 }
+
+// wsWriteTimeout bounds a single frame write. Without it a client that
+// simply stops reading fills its TCP send buffer and the write blocks
+// forever - and callers here write while holding the global game mutex, so
+// one such connection would stall the game for everybody.
+const wsWriteTimeout = 5 * time.Second
 
 func (sc *safeConn) writeJSON(v any) error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
-	return sc.conn.WriteJSON(v)
+	_ = sc.conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
+	err := sc.conn.WriteJSON(v)
+	if err != nil {
+		// A failed write leaves a websocket unusable. Closing it makes the
+		// reader goroutine return so the normal disconnect cleanup runs,
+		// instead of leaving a dead socket in userConnections forever.
+		_ = sc.conn.Close()
+	}
+	return err
 }
 
 var mu sync.Mutex
@@ -41,8 +68,21 @@ var Players = make(map[string]*playerData)
 var newBullets = []*bulletData{}
 var bulletsToRemove = []string{}
 var killsList = []*playerHitData{}
-var hasPlayersTosend = false
-var blackHoles = make(map[int64]models.BlackHoleData)
+
+// npcs holds the latest full snapshot of every NPC (black holes and future
+// NPC kinds), as pushed by the ships-npc service. ships-go doesn't simulate
+// NPCs itself anymore: it just relays this snapshot to players.
+var npcs = make(map[string]npcData)
+
+// npcControllerId is the socketId of the one connection currently allowed to
+// drive the NPCs. Every npcUpdate replaces the whole snapshot, so two
+// controllers (a stray instance left running next to a restarted one) do not
+// add up: they overwrite each other every tick. Players then see NPCs flicker
+// in and out of existence - unnamed, undrawn and impossible to hit, while
+// their bullets keep arriving. The first controller to authenticate keeps the
+// role until it disconnects, so a duplicate is refused instead of corrupting
+// the game.
+var npcControllerId string
 
 var cardSizeX = 3840
 var cardSizeY = 3840
@@ -103,9 +143,22 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		mu.Lock() // to ensure thread safety when modifying the maps
 		delete(userConnections, socketId)
 		delete(Players, socketId)
+		// Releasing the NPC controller role also drops its NPCs: they are
+		// only alive as long as something is simulating them, and leaving
+		// the last snapshot behind would strand ghost ships that never move
+		// and can never be killed.
+		if socketId == npcControllerId {
+			npcControllerId = ""
+			npcs = make(map[string]npcData)
+			// Its resource metrics go with it: publishing the last sample
+			// of a process that is known to be gone would show a dead
+			// service idling at a plausible-looking CPU figure.
+			clearNpcMetrics()
+			log.Println("NPC controller disconnected, NPCs cleared")
+		}
 		mu.Unlock()
 	}(conn, socketId)
-	sc := &safeConn{conn: conn}
+	sc := &safeConn{conn: conn, remoteAddr: r.RemoteAddr}
 	mu.Lock()
 	userConnections[socketId] = sc
 	mu.Unlock()
@@ -144,6 +197,10 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 			log.Println("New connection with socketId: " + socketId)
 			msg.SocketId = socketId
 			_ = conn.writeJSON(msg)
+			// Sent straight after, so a client that joins mid-game starts
+			// out enforcing the rules currently in force rather than the
+			// defaults compiled into it.
+			sendGameSettings(conn)
 		case "playerData":
 
 			var plData *playerData
@@ -187,10 +244,96 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 			killsList = append(killsList, plHitData)
 			playerFrom, ok := Players[plHitData.From]
 			if ok {
-				hasPlayersTosend = true
 				playerFrom.Credits += 100
+				// Queue the killer so the new credit total actually reaches
+				// the clients: without this it only ships out on that
+				// player's next playerData frame. (This replaces a
+				// `hasPlayersTosend = true` flag that nothing ever read.)
+				playersToSend[plHitData.From] = playerFrom
 			}
 			mu.Unlock()
+		case "npcAuth":
+			var auth models.NpcAuthData
+			_ = json.Unmarshal(raw, &auth)
+			if !isNpcAuthValid(conn, auth.Secret) {
+				log.Println("Rejected npcAuth attempt from " + conn.remoteAddr)
+				break
+			}
+
+			mu.Lock()
+			_, incumbentAlive := userConnections[npcControllerId]
+			taken := npcControllerId != "" && npcControllerId != socketId && incumbentAlive
+			if !taken {
+				npcControllerId = socketId
+			}
+			mu.Unlock()
+
+			if taken {
+				// Refusing is safer than taking over: two live controllers
+				// would otherwise evict each other in a loop. A genuine
+				// restart frees the role as soon as its old socket closes.
+				log.Println("Refusing second NPC controller from " + conn.remoteAddr +
+					": one is already connected")
+				_ = conn.writeJSON(gin.H{
+					"eventName": "npcRejected",
+					"reason":    "another NPC controller is already connected",
+				})
+				break
+			}
+
+			conn.isNpc.Store(true)
+			log.Println("NPC controller authenticated from " + conn.remoteAddr)
+			// Tell it the settings in force right away, so a restart
+			// of either process converges without an admin having to
+			// re-save the panel.
+			sendNpcSettings(conn)
+		case "npcUpdate":
+			if !conn.isNpc.Load() {
+				log.Println("Ignoring npcUpdate from unauthenticated connection " + conn.remoteAddr)
+				continue
+			}
+			var update models.NpcUpdateData
+			_ = json.Unmarshal(raw, &update)
+			mu.Lock()
+			npcs = make(map[string]npcData, len(update.Npcs))
+			for _, npc := range update.Npcs {
+				npcs[npc.Id] = npc
+			}
+			mu.Unlock()
+		case "npcMetrics":
+			if !conn.isNpc.Load() {
+				log.Println("Ignoring npcMetrics from unauthenticated connection " + conn.remoteAddr)
+				continue
+			}
+			var metrics models.NpcMetricsData
+			_ = json.Unmarshal(raw, &metrics)
+			// Its own lock, not the game mutex: this arrives every few
+			// seconds from one connection and is read by a Prometheus
+			// scrape, so there is no reason for it to queue behind the
+			// tick loop.
+			storeNpcMetrics(metrics)
+		case "npcHit":
+			// A player's client detected that its own bullet hit a Ship NPC
+			// (see checkBulletCollision in ships-vue). ships-go doesn't
+			// track NPC health itself, so just forward this to whichever
+			// connection(s) are the authenticated NPC controller
+			// (ships-npc), which owns that state.
+			var hit npcHitData
+			_ = json.Unmarshal(raw, &hit)
+			// Collect under the lock, write after releasing it: a slow or
+			// dead socket must never block the game loop (the same rule
+			// SetNpcSettings follows).
+			mu.Lock()
+			npcConns := make([]*safeConn, 0, 1)
+			for _, c := range userConnections {
+				if c.isNpc.Load() {
+					npcConns = append(npcConns, c)
+				}
+			}
+			mu.Unlock()
+			for _, c := range npcConns {
+				_ = c.writeJSON(hit)
+			}
 		default:
 			log.Println("--------------------------")
 			log.Println("Unknown event: " + msg.EventName)
@@ -199,10 +342,19 @@ func manageInputMessage(conn *safeConn, msgPlain []byte, socketId string) {
 	}
 }
 
+// backgroundCardsOnce guards the lazy build below. Every client calls
+// getBackgroundCards on join from its own reader goroutine, so a plain
+// `if len(...) > 0 { return }` guard both races the map writes (a fatal,
+// unrecoverable "concurrent map writes") and lets a second caller observe a
+// half-built map. Once() makes the build happen exactly once and blocks
+// later callers until it is finished; the map is read-only afterwards.
+var backgroundCardsOnce sync.Once
+
 func buildBackgroundCards() {
-	if len(BackgroundCards) > 0 {
-		return
-	}
+	backgroundCardsOnce.Do(buildBackgroundCardsOnce)
+}
+
+func buildBackgroundCardsOnce() {
 	var w = cardSizeX
 	var h = cardSizeY
 
@@ -234,8 +386,6 @@ func wsGetBackgroundCards(conn *safeConn) {
 }
 
 var lastBroadcastTime int64 = 0
-var lastBlackHole int64 = 0
-var newBlackHoleInterval int64 = 30000 // 30 seconds
 
 func broadCastInterval() {
 	ticker := time.NewTicker(time.Second / 30)
@@ -246,15 +396,49 @@ func broadCastInterval() {
 }
 
 func broadCastIntervalLoop() {
-	ActivePlayers.Set(float64(len(Players)))
+	payload, conns := collectBroadcast()
+	if payload == nil {
+		return
+	}
+	// Written after the lock is released: a slow or dead socket must never
+	// stall the game loop for everybody else. writeJSON has its own
+	// deadline and closes the connection on failure.
+	for _, c := range conns {
+		_ = c.writeJSON(payload)
+	}
+}
+
+// collectBroadcast builds this tick's payload and the list of connections to
+// send it to, draining the per-tick buffers. It returns a nil payload when
+// there is nothing to send. All shared state is touched here, under mu, and
+// nowhere else in the broadcast path.
+func collectBroadcast() (map[string]any, []*safeConn) {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// Read under the lock: Players is written by every connection's reader
+	// goroutine, so even len() is a race from this ticker's goroutine.
+	ActivePlayers.Set(float64(len(Players)))
+
 	var currentTime = time.Now().UnixMilli()
 
-	// send at least every 2 seconds or if there are any new bullets, players, or kills to send
-	if len(Players) == 0 || (len(playersToSend)+len(newBullets)+len(killsList)+len(blackHoles) == 0 && currentTime-lastBroadcastTime < 2000) {
-		return
+	if len(Players) == 0 {
+		// Nobody is playing, so there is nothing to render - but the
+		// buffers must still be drained. ships-npc stays connected and
+		// keeps firing, and anything left here would be retained until
+		// somebody joined and then delivered as one enormous frame.
+		drainBroadcastBuffers()
+		// The NPC controller is still sent the (now empty) player list
+		// every 2s: otherwise it never learns the last player left, and
+		// carries on chasing and shooting a ghost forever.
+		if currentTime-lastBroadcastTime < 2000 {
+			return nil, nil
+		}
+	} else if len(playersToSend)+len(newBullets)+len(killsList)+len(npcs) == 0 &&
+		currentTime-lastBroadcastTime < 2000 {
+		// Send at least every 2 seconds, or as soon as there are new
+		// bullets, players or kills to send.
+		return nil, nil
 	}
 	lastBroadcastTime = currentTime
 
@@ -263,8 +447,6 @@ func broadCastIntervalLoop() {
 		playerIds = append(playerIds, id)
 	}
 
-	moveNPCs()
-
 	var payload = map[string]any{
 		"eventName":       "gameBroadcast",
 		"bulletsToRemove": bulletsToRemove,
@@ -272,98 +454,69 @@ func broadCastIntervalLoop() {
 		"players":         playersToSend,
 		"kills":           killsList,
 		"activePlayerIds": playerIds,
-		"blackHoles":      blackHoles,
-	}
-
-	if len(Players) > 1 && (currentTime-lastBlackHole) > newBlackHoleInterval && len(blackHoles) < 10 {
-		var blackHole = createNewBlackHole()
-		blackHoles[blackHole.Id] = blackHole
-		lastBlackHole = currentTime
+		"npcs":            npcs,
 	}
 
 	conns := make([]*safeConn, 0, len(userConnections))
 	for _, c := range userConnections {
 		conns = append(conns, c)
 	}
+	drainBroadcastBuffers()
+
+	return payload, conns
+}
+
+// drainBroadcastBuffers resets the per-tick accumulators. The payload keeps
+// the old slices/map, so replacing them here (rather than truncating) is
+// what makes handing them to the marshaller safe.
+func drainBroadcastBuffers() {
 	bulletsToRemove = []string{}
 	killsList = []*playerHitData{}
 	newBullets = []*bulletData{}
 	playersToSend = make(map[string]*playerData)
-
-	for _, c := range conns {
-		_ = c.writeJSON(payload)
-	}
 }
 
-func createNewBlackHole() models.BlackHoleData {
-	var minX, minY, maxX, maxY float32
-	first := true
-	for id := range Players {
-		if first {
-			minX = Players[id].X
-			minY = Players[id].Y
-			maxX = Players[id].X
-			maxY = Players[id].Y
-			first = false
-			continue
-		}
-
-		minX = min(minX, Players[id].X)
-		minY = min(minY, Players[id].Y)
-		maxX = max(maxX, Players[id].X)
-		maxY = max(maxY, Players[id].Y)
+// isNpcAuthValid only allows NPC controller connections (ships-npc) coming
+// from localhost and presenting the shared secret configured via the
+// NPC_SECRET env var, so a stray websocket client can't inject fake NPCs.
+func isNpcAuthValid(conn *safeConn, secret string) bool {
+	expectedSecret := os.Getenv("NPC_SECRET")
+	if expectedSecret == "" {
+		return false
 	}
-
-	minX -= 2000
-	maxX += 2000
-	minY -= 2000
-	maxY += 2000
-
-	var rangeX = maxX - minX
-	var rangeY = maxY - minY
-
-	var blackHole = models.BlackHoleData{
-		Type:      models.NpcTypes.BlackHole,
-		X:         rand.Float64()*float64(rangeX) + float64(minX),
-		Y:         rand.Float64()*float64(rangeY) + float64(minY),
-		Scale:     0.01,
-		MaxSize:   800,
-		Direction: rand.Float64() * 360,
-		Duration:  180000,
-		Id:        time.Now().UnixMilli(),
-		Speed:     7.5,
+	// Constant-time: `!=` returns as soon as two bytes differ, which leaks
+	// how much of the secret was right. The loopback check below makes this
+	// hard to exploit remotely, but anything co-located on the host - or a
+	// local reverse proxy, where every RemoteAddr is 127.0.0.1 - leaves the
+	// secret as the only real control.
+	if subtle.ConstantTimeCompare([]byte(secret), []byte(expectedSecret)) != 1 {
+		return false
 	}
-
-	return blackHole
+	return isLoopbackAddr(conn.remoteAddr)
 }
-func moveNPCs() {
-	blackHoleIdsToRemove := []int64{}
-	for id, blackHole := range blackHoles {
-		var currentDuration = time.Now().UnixMilli() - id
-		var maxDuration = int64(blackHole.Duration)
-		var inTime = currentDuration < maxDuration
-		var scaleInc = float64(0.01)
 
-		if inTime && blackHole.Scale < 1.0 {
-			blackHole.Scale += scaleInc
-		} else if !inTime && blackHole.Scale <= 0.01 {
-			blackHoleIdsToRemove = append(blackHoleIdsToRemove, id)
-			continue
-		} else if !inTime && blackHole.Scale > 0.01 {
-			blackHole.Scale -= scaleInc
-		}
-
-		// Move the black hole in the direction it's facing
-		radians := blackHole.Direction * (3.141592653589793 / 180) // Convert degrees to radians
-		speed := blackHole.Speed                                   // Adjust this value for desired speed
-		blackHole.X += speed * float64(math.Cos(radians))
-		blackHole.Y += speed * float64(math.Sin(radians))
-
-		// Update the black hole in the map
-		blackHoles[id] = blackHole
+func isLoopbackAddr(remoteAddr string) bool {
+	host := remoteAddr
+	if h, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		host = h
 	}
+	host = strings.Trim(host, "[]")
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
 
-	for _, id := range blackHoleIdsToRemove {
-		delete(blackHoles, id)
+// SnapshotPlayers returns a copy of the live player map, taken under the
+// game lock. Callers outside this package (the admin HTTP handlers) run on
+// their own goroutines, and ranging over the live map while a player's
+// reader goroutine writes to it is not a race the runtime tolerates: it
+// aborts the whole process with "concurrent map iteration and map write".
+func SnapshotPlayers() map[string]*playerData {
+	mu.Lock()
+	defer mu.Unlock()
+
+	out := make(map[string]*playerData, len(Players))
+	for id, p := range Players {
+		out[id] = p
 	}
+	return out
 }

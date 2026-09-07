@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ships/controllers/websocket"
+	"ships/controllers/websocket/models"
 )
 
 func registerAdminRoutes(router *gin.Engine) {
@@ -51,7 +52,7 @@ func getAdminGameData(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{
-		"players":     websocket.Players,
+		"players":     websocket.SnapshotPlayers(),
 		"resultCards": websocket.BackgroundCards,
 	})
 }
@@ -78,6 +79,7 @@ func getAdminData(c *gin.Context) {
 		"currentResolution":  currentResolution,
 		"allowedPlayerTypes": allowedPlayerTypes,
 		"allowedPlayerType":  allowedPlayerType,
+		"npcSettings":        websocket.GetNpcSettings(),
 	})
 }
 
@@ -106,11 +108,18 @@ func postAdminData(c *gin.Context) {
 
 	currentResolution, _ = strconv.Atoi(body.Resolution)
 	allowedPlayerType, _ = strconv.Atoi(body.AllowedPlayerType)
-	c.IndentedJSON(http.StatusOK, gin.H{"success": true})
+	// Stored here but simulated in ships-npc, so this also pushes the new
+	// values down its websocket; they take effect on its next tick, with
+	// nothing to restart. ships-npc clamps them, so no validation here.
+	if body.NpcSettings != nil {
+		websocket.SetNpcSettings(*body.NpcSettings)
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"success": true, "npcSettings": websocket.GetNpcSettings()})
 
 }
 
 type adminDataBody struct {
-	AllowedPlayerType string `json:"allowedPlayerType"`
-	Resolution        string `json:"resolution"`
+	AllowedPlayerType string                  `json:"allowedPlayerType"`
+	Resolution        string                  `json:"resolution"`
+	NpcSettings       *models.NpcSettingsData `json:"npcSettings"`
 }

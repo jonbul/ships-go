@@ -79,5 +79,5 @@ func getShips(c *gin.Context) {
 }
 
 func getPlayers(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, websocket.Players)
+	c.IndentedJSON(http.StatusOK, websocket.SnapshotPlayers())
 }

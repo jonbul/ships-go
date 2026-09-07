@@ -1,6 +1,10 @@
 #!/bin/sh
 set -x # show commands in execution
 
+# Once Grafana is up, import shipsDashboard.json from this folder:
+# Dashboards -> New -> Import -> upload the file -> pick the Prometheus
+# datasource when prompted (the export carries no datasource UID on purpose).
+
 ROOT_PATH="/home/jonbul/servers/monitoring"
 
 echo "=== CREAR RED DOCKER (si no existe) ==="

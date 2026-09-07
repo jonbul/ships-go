@@ -18,6 +18,11 @@ func RegisterPrometheusRoutes(router *gin.Engine) {
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		activePlayers,
+		// The Go and process collectors above describe *this* process. The
+		// NPC simulation runs in ships-npc, which has no HTTP server and is
+		// not reachable to be scraped, so it pushes its own CPU and memory
+		// up the websocket and they are re-exported here.
+		websocket.NewNpcMetricsCollector(),
 	)
 
 	router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
