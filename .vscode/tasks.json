@@ -1,0 +1,67 @@
+{
+  // Native VS Code alternative to scripts/runDevEnvironment.sh's Konsole-tab
+  // trick (which only works in an actual Konsole window, not in VS Code's
+  // integrated terminal). Running a task opens it in its own terminal tab
+  // in the Panel, so each project gets its own visible log.
+  //
+  // Usage: open this folder (ships-go) in VS Code, then:
+  //   1) Run "MongoDB" once (Terminal > Run Task...). It's interactive and
+  //      has its own "type exit to remove the container" loop.
+  //   2) Once MongoDB is up, run "Dev: ships-go + ships-npc + ships-vue" to
+  //      start the other 3 in parallel, each in its own tab.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "MongoDB",
+      "type": "shell",
+      "command": "./scripts/runMongoContainer.sh",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "ships-dev"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ships-go",
+      "type": "shell",
+      "command": "go run .",
+      "presentation": {
+        "panel": "dedicated",
+        "group": "ships-dev"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ships-npc",
+      "type": "shell",
+      "command": "go run .",
+      "options": {
+        "cwd": "${workspaceFolder}/../ships-npc"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "ships-dev"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "ships-vue",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/../ships-vue"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "ships-dev"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Dev: ships-go + ships-npc + ships-vue",
+      "dependsOrder": "parallel",
+      "dependsOn": ["ships-go", "ships-npc", "ships-vue"],
+      "problemMatcher": []
+    }
+  ]
+}
